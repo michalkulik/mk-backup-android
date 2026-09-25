@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  # The GitHub-hosted runner image ships a complete Android SDK; the
+  # android-actions/setup-android action currently fails while running
+  # "sdkmanager tools", so the SDK is used directly instead.
+  ANDROID_HOME: /usr/local/lib/android/sdk
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install required SDK packages
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n1)"
+          fi
+          echo "using $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          for pkg in "platform-tools" "platforms;android-37.0" "platforms;android-36" \
+                     "build-tools;37.0.0" "build-tools;36.0.0"; do
+            yes | "$SDKMANAGER" "$pkg" > /dev/null 2>&1 || echo "skipped: $pkg"
+          done
+          "$SDKMANAGER" --list_installed || true
+
+      - name: Build release APK
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace
+
+      - name: Collect APK
+        run: |
+          mkdir -p artifacts
+          VERSION="${GITHUB_REF_NAME:-dev}"
+          cp app/build/outputs/apk/release/app-release.apk "artifacts/mk-backup-${VERSION}.apk"
+          ls -l artifacts
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*.apk
+          generate_release_notes: true
+          name: mk-backup ${{ github.ref_name }}
+          body: |
+            Podpisany APK aplikacji **mk-backup**.
+
+            Co potrafi:
+            * cykliczny (WorkManager) backup wybranych folderów z pamięci wewnętrznej,
+            * przyrostowe wysyłanie — tylko dodane i zmienione pliki, wykrywane po SHA-256,
+            * jeden plik archiwum na wersję po stronie serwera,
+            * konfigurowalna retencja i warunki (ładowanie / sieć bez limitu),
+            * natywny interfejs Material 3.
+
+            Instalacja: pobierz plik `mk-backup-${{ github.ref_name }}.apk` i zainstaluj go
+            na telefonie (konieczne zezwolenie na instalację z nieznanych źródeł).
+
+            Serwer: <https://github.com/michalkulik/mk-backup-server>
+
+      - name: Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mk-backup-apk
+          path: artifacts/*.apk

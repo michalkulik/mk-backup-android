@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">mk-backup</string>
+
+    <!-- Powiadomienia -->
+    <string name="notification_channel_progress">Postęp kopii zapasowej</string>
+    <string name="notification_channel_progress_description">Wyświetlane w trakcie wykonywania kopii zapasowej.</string>
+    <string name="notification_channel_result">Wyniki kopii zapasowej</string>
+    <string name="notification_channel_result_description">Wyświetlane po zakończeniu kopii zapasowej.</string>
+    <string name="notification_progress_title">Kopia zapasowa: %1$s</string>
+    <string name="notification_progress_scanning">Skanowanie folderów… %1$d plików</string>
+    <string name="notification_progress_hashing">Sprawdzanie zmian… %1$d/%2$d</string>
+    <string name="notification_progress_uploading">Wysyłanie %1$d/%2$d · %3$s</string>
+    <string name="notification_progress_finalising">Budowanie archiwum na serwerze…</string>
+    <string name="notification_result_title">Kopia zapasowa: %1$s</string>
+    <string name="notification_result_unchanged">Brak zmian od ostatniego uruchomienia.</string>
+    <string name="notification_result_success">Wysłano %1$d plik(ów) (%2$s) · wersja %3$d</string>
+    <string name="notification_result_failed">Błąd: %1$s</string>
+    <string name="notification_result_cancelled">Przerwano.</string>
+    <string name="notification_result_skipped">Pominięto: %1$s</string>
+
+    <!-- Lista zestawów -->
+    <string name="sets_title">Zestawy kopii zapasowych</string>
+    <string name="sets_empty_title">Brak zestawów kopii zapasowych</string>
+    <string name="sets_empty_description">Dodaj zestaw, wybierz foldery, które chcesz chronić, i wskaż swój serwer.</string>
+    <string name="set_unnamed">Zestaw bez nazwy</string>
+    <string name="set_summary_folders">Foldery: %1$d</string>
+    <string name="set_disabled">wyłączony</string>
+    <string name="set_never_run">Nigdy nie uruchamiano</string>
+    <string name="set_last_run_success">Ostatnio %1$s · %2$d plik(ów) · wersja %3$d</string>
+    <string name="set_last_run_failed">Ostatnio %1$s — błąd: %2$s</string>
+    <string name="set_last_run_cancelled">Ostatnio %1$s — przerwano</string>
+    <string name="set_last_run_skipped">Ostatnio %1$s — pominięto: %2$s</string>
+    <string name="set_running">Kopia zapasowa w toku…</string>
+
+    <!-- Harmonogram -->
+    <string name="schedule_every_hour">Co godzinę</string>
+    <string name="schedule_every_hours">Co %1$d godz.</string>
+    <string name="schedule_daily">Codziennie</string>
+    <string name="schedule_weekly">Co tydzień</string>
+    <string name="schedule_charging">Tylko podczas ładowania</string>
+    <string name="schedule_charging_description">Poczekaj z wysyłaniem na podłączenie ładowarki.</string>
+    <string name="schedule_unmetered">Tylko w sieciach bez limitu</string>
+    <string name="schedule_unmetered_description">Pomiń sieci Wi‑Fi, które system oznacza jako rozliczane.</string>
+
+    <!-- Edycja -->
+    <string name="edit_title_new">Nowy zestaw kopii zapasowych</string>
+    <string name="edit_title_existing">Edycja zestawu kopii zapasowych</string>
+    <string name="field_name">Nazwa</string>
+    <string name="section_folders">Foldery</string>
+    <string name="folders_empty">Nie wybrano jeszcze żadnego folderu.</string>
+    <string name="action_add_folder">Dodaj folder</string>
+    <string name="section_server">Serwer docelowy</string>
+    <string name="field_server_url">Adres serwera</string>
+    <string name="field_token">Token API</string>
+    <string name="action_toggle_token">Pokaż lub ukryj token</string>
+    <string name="section_schedule">Harmonogram</string>
+    <string name="field_schedule">Częstotliwość</string>
+    <string name="section_retention">Retencja</string>
+    <string name="field_keep_versions">Liczba wersji na serwerze</string>
+    <string name="keep_versions_value">%1$d</string>
+    <string name="retention_description">Starsze archiwa są usuwane z serwera, gdy istnieje już tyle nowszych wersji.</string>
+    <string name="section_exclusions">Wykluczenia</string>
+    <string name="exclusions_description">Wzorce glob rozdzielone przecinkami, dopasowywane do ścieżki lub nazwy pliku. Przykłady: *.tmp, Cache/**, .thumbnails</string>
+    <string name="validation_name_required">Podaj nazwę zestawu.</string>
+    <string name="validation_folders_required">Wybierz co najmniej jeden folder.</string>
+    <string name="validation_server_required">Podaj adres serwera.</string>
+
+    <!-- Szczegóły -->
+    <string name="detail_local_state">Lokalny stan przyrostowy</string>
+    <string name="detail_local_version">Ostatnia wersja</string>
+    <string name="detail_local_files">Śledzone pliki</string>
+    <string name="detail_local_bytes">Rozmiar łącznie</string>
+    <string name="action_reset_manifest">Wyzeruj (kolejne uruchomienie porówna się z serwerem)</string>
+    <string name="detail_remote_versions">Wersje na serwerze</string>
+    <string name="detail_loading">Wczytywanie…</string>
+    <string name="detail_error">Nie udało się połączyć z serwerem: %1$s</string>
+    <string name="detail_no_versions">Na serwerze nie ma jeszcze żadnej wersji.</string>
+    <string name="version_label">Wersja %1$d</string>
+    <string name="version_details">%1$d plik(ów) · %2$s danych · archiwum %3$s</string>
+    <string name="detail_history">Historia lokalna</string>
+    <string name="detail_no_runs">Nie zapisano jeszcze żadnych uruchomień.</string>
+    <string name="delete_set_title">Usunąć zestaw kopii zapasowych?</string>
+    <string name="delete_set_message">„%1$s” zostanie usunięty z tego urządzenia. Kopie już zapisane na serwerze pozostaną.</string>
+    <string name="delete_version_title">Usunąć wersję z serwera?</string>
+    <string name="delete_version_message">Wersja %1$d i jej archiwum zostaną usunięte z serwera.</string>
+    <string name="run_detail_success">Wysłano %1$d (%2$s) · nowe %3$d, zmienione %4$d, usunięte %5$d · v%6$d</string>
+    <string name="run_detail_failed">Błąd: %1$s</string>
+    <string name="run_detail_cancelled">Przerwano</string>
+    <string name="run_detail_skipped">Pominięto: %1$s</string>
+    <string name="server_no_token">nie ustawiono</string>
+    <string name="value_yes">tak</string>
+
+    <!-- Ustawienia -->
+    <string name="settings_title">Ustawienia</string>
+    <string name="settings_default_server">Serwer domyślny</string>
+    <string name="settings_default_server_description">Kopiowany do każdego nowego zestawu. Istniejące zestawy zachowują własne wartości.</string>
+    <string name="settings_saved">Zapisano.</string>
+    <string name="action_check_server">Testuj połączenie</string>
+    <string name="server_check_checking">Łączenie z serwerem…</string>
+    <string name="server_check_ok">Serwer odpowiada (status: %1$s, wersja %2$s).</string>
+    <string name="server_check_failed">Połączenie nieudane: %1$s</string>
+    <string name="settings_device">To urządzenie</string>
+    <string name="settings_device_id">Identyfikator porządkujący kopie na serwerze:</string>
+    <string name="settings_about">O aplikacji</string>
+    <string name="settings_version">mk-backup %1$s</string>
+    <string name="settings_about_description">Przyrostowe kopie wybranych folderów, wysyłane na własny serwer i przechowywane tam jako jedno archiwum na wersję.</string>
+
+    <!-- Wspólne akcje -->
+    <string name="action_add_set">Nowy zestaw</string>
+    <string name="action_run_now">Uruchom teraz</string>
+    <string name="action_stop">Zatrzymaj</string>
+    <string name="action_edit">Edytuj</string>
+    <string name="action_delete">Usuń</string>
+    <string name="action_save">Zapisz</string>
+    <string name="action_cancel">Anuluj</string>
+    <string name="action_back">Wstecz</string>
+    <string name="action_settings">Ustawienia</string>
+    <string name="action_remove">Usuń</string>
+    <string name="action_refresh">Odśwież</string>
+    <string name="action_clear">Wyczyść</string>
+</resources>

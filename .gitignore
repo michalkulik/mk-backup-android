@@ -1,0 +1,19 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+build/
+/captures
+.externalNativeBuild
+.cxx
+.kotlin/
+local.properties
+*.apk
+*.aab
+!keystore/*.jks
+
+# Local Python virtualenv for the server side, never part of the Android repo.
+.venv/
+__pycache__/
+*.pyc

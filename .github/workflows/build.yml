@@ -1,0 +1,57 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+env:
+  # The GitHub-hosted runner image ships a complete Android SDK; the
+  # android-actions/setup-android action currently fails while running
+  # "sdkmanager tools", so the SDK is used directly instead.
+  ANDROID_HOME: /usr/local/lib/android/sdk
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install required SDK packages
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n1)"
+          fi
+          echo "using $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          # compileSdk 37 is provided by the versioned package "platforms;android-37.0".
+          for pkg in "platform-tools" "platforms;android-37.0" "platforms;android-36" \
+                     "build-tools;37.0.0" "build-tools;36.0.0"; do
+            yes | "$SDKMANAGER" "$pkg" > /dev/null 2>&1 || echo "skipped: $pkg"
+          done
+          "$SDKMANAGER" --list_installed || true
+
+      - name: Unit tests
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
+
+      - name: Build debug APK
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: mk-backup-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
