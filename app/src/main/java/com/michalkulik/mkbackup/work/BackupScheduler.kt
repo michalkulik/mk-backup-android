@@ -39,7 +39,7 @@ object BackupScheduler {
             .setConstraints(constraintsFor(set))
             .setInputData(workDataOf(BackupWorker.KEY_SET_ID to set.id))
             .addTag(TAG)
-            .addTag(setTag(set.id))
+            .addTag(periodicTag(set.id))
             .build()
 
         workManager.enqueueUniquePeriodicWork(
@@ -54,14 +54,24 @@ object BackupScheduler {
         WorkManager.getInstance(context).cancelUniqueWork(periodicName(setId))
     }
 
-    /** Fires an immediate run, replacing any run that is still queued for the same set. */
+    /**
+     * Fires an immediate run, replacing any run that is still queued for the same set.
+     *
+     * The charging / battery-not-low conditions of the periodic job are deliberately not applied:
+     * they exist so the app does not wake the phone on its own schedule, and must not block a run
+     * the user just asked for. The network preference is still honoured.
+     *
+     * They also *cannot* be applied here: WorkManager rejects
+     * `Expedited jobs only support network and storage constraints`, so passing the periodic
+     * constraints to an expedited request crashes the app.
+     */
     fun runNow(context: Context, set: BackupSet) {
         val request = OneTimeWorkRequestBuilder<BackupWorker>()
-            .setConstraints(constraintsFor(set))
+            .setConstraints(runNowConstraints(set))
             .setInputData(workDataOf(BackupWorker.KEY_SET_ID to set.id))
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
             .addTag(TAG)
-            .addTag(setTag(set.id))
+            .addTag(runTag(set.id))
             .build()
 
         WorkManager.getInstance(context).enqueueUniqueWork(
@@ -75,6 +85,13 @@ object BackupScheduler {
         WorkManager.getInstance(context).cancelUniqueWork(runNowName(setId))
     }
 
+    /** Constraints allowed on an expedited request: network only, never battery or charging. */
+    private fun runNowConstraints(set: BackupSet) = Constraints.Builder()
+        .setRequiredNetworkType(
+            if (set.requireUnmetered) NetworkType.UNMETERED else NetworkType.CONNECTED,
+        )
+        .build()
+
     private fun constraintsFor(set: BackupSet) = Constraints.Builder()
         .setRequiredNetworkType(
             if (set.requireUnmetered) NetworkType.UNMETERED else NetworkType.CONNECTED,
@@ -87,8 +104,18 @@ object BackupScheduler {
 
     private fun runNowName(setId: String) = "mkbackup-run-$setId"
 
-    /** Tag that lets the UI map a `WorkInfo` back to the backup set it belongs to. */
-    fun setTag(setId: String) = "mkbackup-set:$setId"
+    /**
+     * Tag on the one-off "run now" work. This is the only tag that means "a backup is happening":
+     * the one-off request is ENQUEUED only while it is actually waiting to start.
+     */
+    fun runTag(setId: String) = "mkbackup-run-set:$setId"
+
+    /**
+     * Tag on the periodic work. It must be distinct from [runTag] because a periodic request spends
+     * almost its entire life in the ENQUEUED state, waiting for its next interval - which is not the
+     * same thing as a backup being in progress.
+     */
+    fun periodicTag(setId: String) = "mkbackup-periodic-set:$setId"
 
     const val TAG = "mkbackup"
 }

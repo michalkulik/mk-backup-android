@@ -8,25 +8,35 @@ import com.michalkulik.mkbackup.work.BackupWorker
 /**
  * Helpers that interpret WorkManager's `WorkInfo` list. They are plain functions (not view model
  * methods) so a Compose screen can collect the list once and stay reactive.
+ *
+ * The distinction between the two kinds of work matters a great deal here. A **periodic** request is
+ * reported as `ENQUEUED` for its whole life - that state simply means "scheduled", not "running" -
+ * while a **one-off** request is `ENQUEUED` only while it is genuinely waiting for its constraints
+ * to be satisfied. Treating a scheduled periodic job as an in-flight backup made the app claim
+ * "backup in progress" forever, so the two are tagged and handled separately.
  */
 object WorkState {
 
-    private fun infosFor(infos: List<WorkInfo>, setId: String): List<WorkInfo> =
-        infos.filter { BackupScheduler.setTag(setId) in it.tags }
+    private fun runs(infos: List<WorkInfo>, setId: String): List<WorkInfo> =
+        infos.filter { BackupScheduler.runTag(setId) in it.tags }
 
+    private fun scheduled(infos: List<WorkInfo>, setId: String): List<WorkInfo> =
+        infos.filter { BackupScheduler.periodicTag(setId) in it.tags }
+
+    /** True only while a worker is really executing, whichever kind of request started it. */
     fun isRunning(infos: List<WorkInfo>, setId: String): Boolean =
-        infosFor(infos, setId).any { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED }
+        (runs(infos, setId) + scheduled(infos, setId)).any { it.state == WorkInfo.State.RUNNING }
 
+    /**
+     * True when a run is executing or is queued and about to start. A periodic request that is
+     * merely waiting for its next interval does not count.
+     */
     fun isActive(infos: List<WorkInfo>, setId: String): Boolean =
-        infosFor(infos, setId).any {
-            it.state == WorkInfo.State.RUNNING ||
-                it.state == WorkInfo.State.ENQUEUED ||
-                it.state == WorkInfo.State.BLOCKED
-        }
+        isRunning(infos, setId) || runs(infos, setId).any { it.state == WorkInfo.State.ENQUEUED }
 
     /** Progress of a currently executing run, or null when nothing is running. */
     fun progressOf(infos: List<WorkInfo>, setId: String): BackupProgress? =
-        infosFor(infos, setId)
+        (runs(infos, setId) + scheduled(infos, setId))
             .firstOrNull { it.state == WorkInfo.State.RUNNING && it.progress.keyValueMap.isNotEmpty() }
             ?.progress
             ?.let { data ->
