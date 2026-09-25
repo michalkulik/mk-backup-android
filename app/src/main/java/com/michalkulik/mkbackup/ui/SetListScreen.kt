@@ -39,6 +39,8 @@ import androidx.work.WorkInfo
 import com.michalkulik.mkbackup.R
 import com.michalkulik.mkbackup.core.BackupSet
 import com.michalkulik.mkbackup.core.RunRecord
+import com.michalkulik.mkbackup.core.formatBytes
+import com.michalkulik.mkbackup.core.formatTimestamp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

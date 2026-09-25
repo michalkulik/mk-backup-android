@@ -13,6 +13,7 @@ import com.michalkulik.mkbackup.R
 import com.michalkulik.mkbackup.backup.BackupProgress
 import com.michalkulik.mkbackup.core.RunRecord
 import com.michalkulik.mkbackup.core.RunStatus
+import com.michalkulik.mkbackup.core.formatBytes
 import com.michalkulik.mkbackup.ui.MainActivity
 
 /** Notification plumbing for a running backup and for its result. */
@@ -126,18 +127,6 @@ object BackupNotifications {
             BackupProgress.Phase.FINALISING -> context.getString(R.string.notification_progress_finalising)
         }
         return title to text
-    }
-
-    fun formatBytes(bytes: Long): String {
-        if (bytes < 1024) return "$bytes B"
-        val units = listOf("KiB", "MiB", "GiB", "TiB")
-        var value = bytes.toDouble() / 1024
-        var index = 0
-        while (value >= 1024 && index < units.lastIndex) {
-            value /= 1024
-            index++
-        }
-        return "%.1f %s".format(value, units[index])
     }
 
     private fun openAppIntent(context: Context): PendingIntent {

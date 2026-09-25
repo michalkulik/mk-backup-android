@@ -13,6 +13,7 @@ import com.michalkulik.mkbackup.net.StartSessionRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.IOException
 
 /** Progress as reported to the UI and to the foreground notification. */
 data class BackupProgress(
@@ -157,8 +158,10 @@ class BackupEngine(
                     currentPath = file.path,
                 ),
             )
+            // A null stream means the document disappeared or the persisted permission was
+            // revoked. That is a real failure, not a user cancellation, so it must surface as one.
             val digest = appContext.contentResolver.openInputStream(file.uri)?.use(Hashing::sha256)
-                ?: throw BackupCancelledException()
+                ?: throw IOException("Cannot read ${file.path} (the file is gone or access was revoked)")
             hashes[file.path] = digest
         }
         onProgress(
@@ -206,7 +209,7 @@ class BackupEngine(
                 mode = if (file.path in modifiedPaths) "modified" else "added",
                 openStream = {
                     appContext.contentResolver.openInputStream(file.uri)
-                        ?: throw BackupCancelledException()
+                        ?: throw IOException("Cannot read ${file.path} (the file is gone or access was revoked)")
                 },
                 onBytes = { uploadedBytes += it },
             )

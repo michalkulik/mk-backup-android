@@ -2,12 +2,6 @@ package com.michalkulik.mkbackup.backup
 
 import com.michalkulik.mkbackup.core.ManifestEntry
 
-/** A scanned file together with the SHA-256 of its content. */
-data class HashedFile(
-    val file: ScannedFile,
-    val sha256: String,
-)
-
 /**
  * The difference between the last successful backup and the state on disk right now.
  *

@@ -47,6 +47,8 @@ import com.michalkulik.mkbackup.core.BackupManifest
 import com.michalkulik.mkbackup.core.BackupSet
 import com.michalkulik.mkbackup.core.RunRecord
 import com.michalkulik.mkbackup.core.RunStatus
+import com.michalkulik.mkbackup.core.formatBytes
+import com.michalkulik.mkbackup.core.formatTimestamp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
