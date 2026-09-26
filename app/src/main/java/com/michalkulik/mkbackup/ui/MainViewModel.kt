@@ -62,6 +62,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _serverCheck = MutableStateFlow<ServerCheckState>(ServerCheckState.Idle)
     val serverCheck: StateFlow<ServerCheckState> = _serverCheck.asStateFlow()
 
+    /** Post a notification after each finished run; toggled in Settings. */
+    val notificationsEnabled: StateFlow<Boolean> = store.revision
+        .map { store.notificationsEnabled() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, store.notificationsEnabled())
+
     // ------------------------------------------------------------------ edits
 
     fun newSet(): BackupSet = BackupSet(
@@ -123,6 +128,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun defaultToken(): String = store.defaultToken()
 
     fun saveDefaults(url: String, token: String) = store.setDefaults(url, token)
+
+    fun setNotificationsEnabled(enabled: Boolean) = store.setNotificationsEnabled(enabled)
 
     // ----------------------------------------------------------------- server
 

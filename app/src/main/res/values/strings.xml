@@ -13,8 +13,8 @@
     <string name="notification_progress_uploading">Uploading %1$d/%2$d · %3$s</string>
     <string name="notification_progress_finalising">Building the archive on the server…</string>
     <string name="notification_result_title">Backup: %1$s</string>
-    <string name="notification_result_unchanged">Nothing changed since the last run.</string>
-    <string name="notification_result_success">%1$d file(s) uploaded (%2$s) · version %3$d</string>
+    <string name="notification_result_unchanged">Nothing changed · %1$d file(s), %2$s</string>
+    <string name="notification_result_success">%1$d file(s) uploaded (%2$s) · new %3$d, changed %4$d, removed %5$d · version %6$d</string>
     <string name="notification_result_failed">Failed: %1$s</string>
     <string name="notification_result_cancelled">Cancelled.</string>
     <string name="notification_result_skipped">Skipped: %1$s</string>
@@ -105,6 +105,8 @@
     <string name="settings_all_files_description">Needed only for folders the system picker hides (for example Android/data). Folders picked with the system dialog work without it.</string>
     <string name="settings_battery">Battery optimization</string>
     <string name="settings_battery_description">If the app is optimized, Android may delay or skip scheduled backups. Excluding it keeps the schedule reliable.</string>
+    <string name="settings_notifications">Notify when a backup finishes</string>
+    <string name="settings_notifications_description">Show a system notification with the result: set, files, size, version, errors.</string>
     <string name="permission_granted">Granted</string>
     <string name="permission_not_granted">Not granted</string>
     <string name="action_grant_access">Grant access</string>

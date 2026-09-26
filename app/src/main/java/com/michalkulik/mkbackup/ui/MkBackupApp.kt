@@ -56,6 +56,7 @@ fun MkBackupApp(context: Context, viewModel: MainViewModel = viewModel()) {
     val workInfos by viewModel.workInfos.collectAsStateWithLifecycle()
     val versions by viewModel.versions.collectAsStateWithLifecycle()
     val serverCheck by viewModel.serverCheck.collectAsStateWithLifecycle()
+    val notificationsEnabled by viewModel.notificationsEnabled.collectAsStateWithLifecycle()
 
     when (val current = screen) {
         Screen.List -> SetListScreen(
@@ -76,6 +77,8 @@ fun MkBackupApp(context: Context, viewModel: MainViewModel = viewModel()) {
             defaultToken = viewModel.defaultToken(),
             deviceId = viewModel.deviceId,
             checkState = serverCheck,
+            notificationsEnabled = notificationsEnabled,
+            onNotificationsChange = viewModel::setNotificationsEnabled,
             onSave = viewModel::saveDefaults,
             onCheck = viewModel::checkServer,
             onBack = {

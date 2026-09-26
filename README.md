@@ -35,6 +35,10 @@ Serwer: <https://github.com/michalkulik/mk-backup-server>
   ciemnym.
 * **Historia i podgląd** — ostatnie uruchomienia z liczbą wysłanych plików oraz lista wersji na
   serwerze z możliwością usunięcia.
+* **Powiadomienie o wyniku** — po każdym zakończonym przebiegu aplikacja wysyła powiadomienie
+  systemowe (sukces lub porażka) ze szczegółami: nazwa zestawu, liczba i rozmiar wysłanych plików,
+  nowe / zmienione / usunięte, numer wersji oraz treść błędu. Wysyłanie można wyłączyć przełącznikiem
+  w Ustawieniach. Na Androidzie 13+ aplikacja prosi o uprawnienie do powiadomień.
 
 ## Jak to działa
 

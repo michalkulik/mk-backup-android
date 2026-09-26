@@ -13,8 +13,8 @@
     <string name="notification_progress_uploading">Wysyłanie %1$d/%2$d · %3$s</string>
     <string name="notification_progress_finalising">Budowanie archiwum na serwerze…</string>
     <string name="notification_result_title">Kopia zapasowa: %1$s</string>
-    <string name="notification_result_unchanged">Brak zmian od ostatniego uruchomienia.</string>
-    <string name="notification_result_success">Wysłano %1$d plik(ów) (%2$s) · wersja %3$d</string>
+    <string name="notification_result_unchanged">Brak zmian · %1$d plik(ów), %2$s</string>
+    <string name="notification_result_success">Wysłano %1$d plik(ów) (%2$s) · nowe %3$d, zmienione %4$d, usunięte %5$d · wersja %6$d</string>
     <string name="notification_result_failed">Błąd: %1$s</string>
     <string name="notification_result_cancelled">Przerwano.</string>
     <string name="notification_result_skipped">Pominięto: %1$s</string>
@@ -105,6 +105,8 @@
     <string name="settings_all_files_description">Potrzebny tylko do folderów ukrytych w systemowym selektorze (np. Android/data). Foldery wybrane systemowo działają bez niego.</string>
     <string name="settings_battery">Optymalizacja baterii</string>
     <string name="settings_battery_description">Jeśli aplikacja jest optymalizowana, Android może odraczać lub pomijać zaplanowane kopie. Wykluczenie jej zapewnia punktualność harmonogramu.</string>
+    <string name="settings_notifications">Powiadamiaj o zakończeniu kopii</string>
+    <string name="settings_notifications_description">Wyświetl powiadomienie systemowe z wynikiem: zestaw, pliki, rozmiar, wersja, błędy.</string>
     <string name="permission_granted">Przyznano</string>
     <string name="permission_not_granted">Nie przyznano</string>
     <string name="action_grant_access">Przyznaj dostęp</string>

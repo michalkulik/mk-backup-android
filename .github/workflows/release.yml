@@ -74,6 +74,8 @@ jobs:
             * jeden plik archiwum na wersję po stronie serwera,
             * konfigurowalna retencja i warunki (ładowanie / sieć bez limitu),
             * adres serwera bez wpisywania http:// (schemat dopisywany automatycznie),
+            * powiadomienie o zakończeniu kopii (sukces / porażka) ze szczegółami zadania
+              i przełącznikiem w Ustawieniach,
             * skrót do wyłączenia optymalizacji baterii i przyznania dostępu do plików,
             * niezawodne zatrzymanie kopii nawet podczas łączenia z błędnym adresem serwera,
             * natywny interfejs Material 3.

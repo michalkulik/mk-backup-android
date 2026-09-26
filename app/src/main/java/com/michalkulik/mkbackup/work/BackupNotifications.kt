@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.michalkulik.mkbackup.R
 import com.michalkulik.mkbackup.backup.BackupProgress
+import com.michalkulik.mkbackup.core.BackupStore
 import com.michalkulik.mkbackup.core.RunRecord
 import com.michalkulik.mkbackup.core.RunStatus
 import com.michalkulik.mkbackup.core.formatBytes
@@ -72,8 +73,10 @@ object BackupNotifications {
         NotificationManagerCompat.from(context).cancel(PROGRESS_NOTIFICATION_ID)
     }
 
-    /** Posted once at the end so the user learns about failures without opening the app. */
+    /** Posted once at the end so the user learns about the outcome without opening the app. */
     fun result(context: Context, setName: String, record: RunRecord) {
+        // The user can switch finish notifications off in Settings.
+        if (!BackupStore.get(context).notificationsEnabled()) return
         val notification = NotificationCompat.Builder(context, CHANNEL_RESULT)
             .setSmallIcon(R.drawable.ic_stat_backup)
             .setContentTitle(context.getString(R.string.notification_result_title, setName))
@@ -88,12 +91,19 @@ object BackupNotifications {
     private fun resultText(context: Context, record: RunRecord): String = when (record.status) {
         RunStatus.SUCCESS ->
             if (record.uploadedFiles == 0 && record.deletedFiles == 0) {
-                context.getString(R.string.notification_result_unchanged)
+                context.getString(
+                    R.string.notification_result_unchanged,
+                    record.totalFiles,
+                    formatBytes(record.totalBytes),
+                )
             } else {
                 context.getString(
                     R.string.notification_result_success,
                     record.uploadedFiles,
                     formatBytes(record.uploadedBytes),
+                    record.addedFiles,
+                    record.modifiedFiles,
+                    record.deletedFiles,
                     record.version,
                 )
             }

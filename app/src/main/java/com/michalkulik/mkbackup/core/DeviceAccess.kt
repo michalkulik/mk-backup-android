@@ -1,6 +1,7 @@
 package com.michalkulik.mkbackup.core
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -9,6 +10,8 @@ import android.os.Build
 import android.os.Environment
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
 /**
  * Small helpers around the two system grants the app recommends: access to all files (so arbitrary
@@ -62,4 +65,25 @@ object DeviceAccess {
 
     fun batteryOptimizationSettingsIntent(): Intent =
         Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+
+    // ------------------------------------------------------------ notifications
+
+    /** Notifications need a runtime permission from Android 13 (API 33). */
+    fun hasNotificationPermission(context: Context): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+
+    /** Asks for the notification permission on Android 13+; a no-op when already granted. */
+    fun requestNotificationPermission(activity: Activity) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (hasNotificationPermission(activity)) return
+        ActivityCompat.requestPermissions(
+            activity,
+            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+            NOTIFICATION_PERMISSION_REQUEST,
+        )
+    }
+
+    private const val NOTIFICATION_PERMISSION_REQUEST = 0x1b0a
 }

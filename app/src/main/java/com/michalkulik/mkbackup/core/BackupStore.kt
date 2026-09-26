@@ -111,6 +111,16 @@ class BackupStore(context: Context) {
         touch()
     }
 
+    // ----------------------------------------------------------- notifications
+
+    /** Whether a notification is posted after a run finishes. Enabled by default. */
+    fun notificationsEnabled(): Boolean = prefs.getBoolean(KEY_NOTIFICATIONS, true)
+
+    fun setNotificationsEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_NOTIFICATIONS, enabled).apply()
+        touch()
+    }
+
     // ----------------------------------------------------------------- helpers
 
     private fun touch() {
@@ -137,6 +147,7 @@ class BackupStore(context: Context) {
         private const val KEY_DEVICE_ID = "device_id"
         private const val KEY_DEFAULT_URL = "default_url"
         private const val KEY_DEFAULT_TOKEN = "default_token"
+        private const val KEY_NOTIFICATIONS = "notifications_enabled"
         private const val MAX_RUNS = 25
 
         @Volatile
