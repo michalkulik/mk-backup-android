@@ -1,6 +1,8 @@
 package com.michalkulik.mkbackup.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.Saver
@@ -58,6 +60,23 @@ fun MkBackupApp(context: Context, viewModel: MainViewModel = viewModel()) {
     val serverCheck by viewModel.serverCheck.collectAsStateWithLifecycle()
     val notificationsEnabled by viewModel.notificationsEnabled.collectAsStateWithLifecycle()
 
+    // The app navigates with its own tiny screen state, so the system Back gesture/button has to
+    // be wired to it explicitly. Without this, Back on any non-root screen finishes the activity
+    // instead of stepping up one level.
+    BackHandler(enabled = screen != Screen.List) {
+        screen = when (val current = screen) {
+            Screen.List -> Screen.List
+            Screen.Settings -> {
+                viewModel.clearServerCheck()
+                Screen.List
+            }
+
+            is Screen.Detail -> Screen.List
+            is Screen.Edit ->
+                if (current.isNew) Screen.List else Screen.Detail(current.setId.orEmpty())
+        }
+    }
+
     when (val current = screen) {
         Screen.List -> SetListScreen(
             sets = sets,
@@ -92,6 +111,9 @@ fun MkBackupApp(context: Context, viewModel: MainViewModel = viewModel()) {
             if (set == null) {
                 screen = Screen.List
             } else {
+                // Load the server version list as soon as the detail screen is shown, instead of
+                // leaving the section on "Loading…" until the user taps refresh.
+                LaunchedEffect(set.id) { viewModel.refreshVersions(set) }
                 SetDetailScreen(
                     set = set,
                     runs = runs[set.id].orEmpty(),
