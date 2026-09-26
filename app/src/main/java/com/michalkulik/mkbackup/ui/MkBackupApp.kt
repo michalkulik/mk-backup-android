@@ -71,6 +71,7 @@ fun MkBackupApp(context: Context, viewModel: MainViewModel = viewModel()) {
         )
 
         Screen.Settings -> SettingsScreen(
+            context = context,
             defaultUrl = viewModel.defaultServerUrl(),
             defaultToken = viewModel.defaultToken(),
             deviceId = viewModel.deviceId,

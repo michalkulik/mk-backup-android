@@ -203,6 +203,7 @@ fun SetDetailScreen(
             item {
                 InfoCard(stringResource(R.string.section_schedule)) {
                     InfoRow(stringResource(R.string.field_schedule), scheduleLabel(set.intervalHours))
+                    InfoRow(stringResource(R.string.field_start_hour), formatHour(set.scheduleHour))
                     InfoRow(
                         stringResource(R.string.field_keep_versions),
                         stringResource(R.string.keep_versions_value, set.keepVersions),

@@ -7,17 +7,20 @@ import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.michalkulik.mkbackup.backup.BackupCancellation
 import com.michalkulik.mkbackup.backup.BackupEngine
 import com.michalkulik.mkbackup.backup.BackupProgress
 import com.michalkulik.mkbackup.core.BackupStore
 import com.michalkulik.mkbackup.core.RunRecord
 import com.michalkulik.mkbackup.core.RunStatus
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -32,6 +35,8 @@ class BackupWorker(
     appContext: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
+
+    private val cancellation = BackupCancellation()
 
     override suspend fun doWork(): Result {
         val setId = inputData.getString(KEY_SET_ID) ?: return Result.failure()
@@ -51,11 +56,24 @@ class BackupWorker(
             return Result.success()
         }
 
-        val engine = BackupEngine(applicationContext, store)
+        val engine = BackupEngine(applicationContext, store, cancellation)
         // `setForeground`/`setProgress` are suspending, so they cannot be called from the engine's
         // plain progress callback. The callback only publishes into this StateFlow and a child
         // coroutine turns the newest value into notification + WorkInfo updates (throttled below).
         val progressFlow = MutableStateFlow(BackupProgress(BackupProgress.Phase.SCANNING))
+
+        // WorkManager cancels the worker's coroutine when Stop is pressed, but a blocking OkHttp
+        // call is immune to coroutine cancellation. This independent watcher notices `isStopped`
+        // and aborts the request on the wire so Stop takes effect immediately.
+        val stopWatcher = CoroutineScope(Dispatchers.IO).launch {
+            while (isActive) {
+                if (isStopped) {
+                    cancellation.cancel()
+                    break
+                }
+                delay(STOP_POLL_MS)
+            }
+        }
 
         try {
             setForeground(foreground(progressFlow.value, set.name))
@@ -73,7 +91,7 @@ class BackupWorker(
                     engine.run(
                         set = set,
                         onProgress = { progress -> progressFlow.value = progress },
-                        isCancelled = { isStopped },
+                        isCancelled = { isStopped || cancellation.isCancelled },
                     )
                 } finally {
                     ticker.cancel()
@@ -101,6 +119,8 @@ class BackupWorker(
             )
             // Retry on transient problems (network, server down) rather than giving up silently.
             return if (runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.failure()
+        } finally {
+            stopWatcher.cancel()
         }
     }
 
@@ -143,5 +163,6 @@ class BackupWorker(
         const val KEY_CURRENT_PATH = "currentPath"
         private const val MAX_ATTEMPTS = 3
         private const val PROGRESS_INTERVAL_MS = 500L
+        private const val STOP_POLL_MS = 300L
     }
 }

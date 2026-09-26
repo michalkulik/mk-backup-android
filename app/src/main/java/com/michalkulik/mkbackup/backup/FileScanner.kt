@@ -3,6 +3,7 @@ package com.michalkulik.mkbackup.backup
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
+import java.io.File
 
 /**
  * A single file discovered under one of the selected folders.
@@ -35,6 +36,7 @@ object FileScanner {
     )
 
     private const val DIRECTORY_MIME = DocumentsContract.Document.MIME_TYPE_DIR
+    private const val SAF_SCHEME = "content://"
 
     /**
      * Scans every tree in [treeUris]. [excludePatterns] are glob patterns (`*`, `?`) matched against
@@ -51,6 +53,18 @@ object FileScanner {
         val result = ArrayList<ScannedFile>()
 
         treeUris.forEach { treeUriString ->
+            // Two kinds of selection are supported: SAF tree URIs (picked with the system dialog)
+            // and plain filesystem paths (picked with the in-app browser when "all files access"
+            // is granted, which is the only way to reach e.g. Android/data).
+            if (!treeUriString.startsWith(SAF_SCHEME)) {
+                val root = File(treeUriString)
+                if (root.isDirectory) {
+                    val rootName = root.name.ifBlank { "root" }
+                    walkFile(root, rootName, matcher, result) { onDiscovered(result.size) }
+                }
+                return@forEach
+            }
+
             val treeUri = runCatching { Uri.parse(treeUriString) }.getOrNull() ?: return@forEach
             val rootId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull()
                 ?: return@forEach
@@ -62,6 +76,34 @@ object FileScanner {
             walk(resolver, childrenUri, rootName, matcher, result) { onDiscovered(result.size) }
         }
         return result
+    }
+
+    /** Walks a plain directory on the filesystem. Used when all-files access is granted. */
+    private fun walkFile(
+        dir: File,
+        parentPath: String,
+        matcher: GlobMatcher,
+        out: MutableList<ScannedFile>,
+        onDiscovered: () -> Unit,
+    ) {
+        val children = dir.listFiles() ?: return
+        for (child in children) {
+            val path = "$parentPath/${child.name}"
+            if (matcher.matches(path)) continue
+            when {
+                child.isDirectory -> walkFile(child, path, matcher, out, onDiscovered)
+                child.isFile -> {
+                    out += ScannedFile(
+                        path = path,
+                        size = child.length(),
+                        modified = child.lastModified(),
+                        // ContentResolver.openInputStream understands file:// as well as content://.
+                        uri = Uri.fromFile(child),
+                    )
+                    onDiscovered()
+                }
+            }
+        }
     }
 
     private fun walk(

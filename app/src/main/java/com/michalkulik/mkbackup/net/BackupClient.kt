@@ -2,8 +2,10 @@ package com.michalkulik.mkbackup.net
 
 import com.michalkulik.mkbackup.core.ManifestEntry
 import com.michalkulik.mkbackup.core.RemoteVersion
+import com.michalkulik.mkbackup.core.normalizeServerUrl
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
+import okhttp3.Call
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
@@ -19,6 +21,7 @@ import okio.source
 import java.io.Closeable
 import java.io.InputStream
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 /** Raised for every non-successful response so the worker can surface a readable message. */
 class BackupApiException(message: String) : Exception(message)
@@ -34,10 +37,17 @@ class BackupClient(
     private val token: String = "",
 ) : Closeable {
 
-    private val root = baseUrl.trim().trimEnd('/')
+    private val root = normalizeServerUrl(baseUrl)
+
+    /**
+     * The call currently on the wire, if any. A blocking OkHttp call ignores coroutine
+     * cancellation, so [cancel] is what actually interrupts an upload or a connection attempt
+     * (for example to a mistyped URL) as soon as the user presses Stop.
+     */
+    private val activeCall = AtomicReference<Call?>(null)
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         // Uploads can legitimately run for many minutes on a slow mobile link.
         .writeTimeout(0, TimeUnit.MILLISECONDS)
@@ -119,7 +129,13 @@ class BackupClient(
                 )
             }
 
+    /** Aborts the request in flight, if any. Safe to call from any thread. */
+    fun cancel() {
+        activeCall.get()?.cancel()
+    }
+
     override fun close() {
+        cancel()
         client.dispatcher.executorService.shutdown()
         client.connectionPool.evictAll()
     }
@@ -153,7 +169,13 @@ class BackupClient(
     }
 
     private fun Request.executeChecked(): Response {
-        val response = client.newCall(this).execute()
+        val call = client.newCall(this)
+        activeCall.set(call)
+        val response = try {
+            call.execute()
+        } finally {
+            activeCall.compareAndSet(call, null)
+        }
         if (!response.isSuccessful) {
             val detail = runCatching { response.body.string() }.getOrNull().orEmpty()
             response.close()
@@ -197,5 +219,10 @@ class BackupClient(
         private companion object {
             const val CHUNK = 64L * 1024L
         }
+    }
+
+    private companion object {
+        /** Short enough that a mistyped host surfaces quickly instead of hanging the run. */
+        const val CONNECT_TIMEOUT_SECONDS = 15L
     }
 }

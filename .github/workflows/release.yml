@@ -67,9 +67,15 @@ jobs:
 
             Co potrafi:
             * cykliczny (WorkManager) backup wybranych folderów z pamięci wewnętrznej,
+            * wybór godziny rozpoczęcia kopii oraz częstotliwości (godzina / dzień / tydzień),
+            * wybór folderów systemowym selektorem albo wbudowaną przeglądarką pamięci
+              (dostęp do wszystkich plików — np. Downloads, Android/data),
             * przyrostowe wysyłanie — tylko dodane i zmienione pliki, wykrywane po SHA-256,
             * jeden plik archiwum na wersję po stronie serwera,
             * konfigurowalna retencja i warunki (ładowanie / sieć bez limitu),
+            * adres serwera bez wpisywania http:// (schemat dopisywany automatycznie),
+            * skrót do wyłączenia optymalizacji baterii i przyznania dostępu do plików,
+            * niezawodne zatrzymanie kopii nawet podczas łączenia z błędnym adresem serwera,
             * natywny interfejs Material 3.
 
             Instalacja: pobierz plik `mk-backup-${{ github.ref_name }}.apk` i zainstaluj go

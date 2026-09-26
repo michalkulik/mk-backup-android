@@ -12,6 +12,8 @@ import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.michalkulik.mkbackup.core.BackupSet
 import com.michalkulik.mkbackup.core.BackupStore
+import java.time.Duration
+import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
 
 /** Turns the stored sets into WorkManager jobs. */
@@ -36,6 +38,8 @@ object BackupScheduler {
             set.intervalHours.coerceAtLeast(1).toLong(),
             TimeUnit.HOURS,
         )
+            // Align the first run with the chosen hour, then repeat from there.
+            .setInitialDelay(delayUntilHour(set.scheduleHour), TimeUnit.MILLISECONDS)
             .setConstraints(constraintsFor(set))
             .setInputData(workDataOf(BackupWorker.KEY_SET_ID to set.id))
             .addTag(TAG)
@@ -99,6 +103,15 @@ object BackupScheduler {
         .setRequiresCharging(set.requireCharging)
         .setRequiresBatteryNotLow(true)
         .build()
+
+    /** Milliseconds from now until the next occurrence of the preferred hour of day. */
+    private fun delayUntilHour(hour: Int): Long {
+        val safeHour = hour.coerceIn(0, 23)
+        val now = ZonedDateTime.now()
+        var next = now.toLocalDate().atTime(safeHour, 0).atZone(now.zone)
+        if (!next.isAfter(now)) next = next.plusDays(1)
+        return Duration.between(now, next).toMillis().coerceAtLeast(0L)
+    }
 
     private fun periodicName(setId: String) = "mkbackup-periodic-$setId"
 

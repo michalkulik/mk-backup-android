@@ -63,6 +63,7 @@ class BackupCancelledException : CancellationException("Backup cancelled")
 class BackupEngine(
     context: Context,
     private val store: BackupStore,
+    private val cancellation: BackupCancellation = BackupCancellation(),
 ) {
 
     private val appContext = context.applicationContext
@@ -78,7 +79,12 @@ class BackupEngine(
 
         try {
             val client = BackupClient(set.serverUrl, set.token)
-            client.use { runInternal(set, client, deviceId, deviceName, onProgress, isCancelled) }
+            cancellation.attach(client)
+            try {
+                client.use { runInternal(set, client, deviceId, deviceName, onProgress, isCancelled) }
+            } finally {
+                cancellation.detach()
+            }
         } catch (cancelled: BackupCancelledException) {
             store.addRun(
                 set.id,
@@ -91,6 +97,20 @@ class BackupEngine(
             )
             throw cancelled
         } catch (error: Throwable) {
+            // Aborting the OkHttp call reports as an IOException; the user asked for Stop, so the
+            // run has to be recorded (and reported) as cancelled, not as a failure.
+            if (cancellation.isCancelled) {
+                store.addRun(
+                    set.id,
+                    RunRecord(
+                        startedAt = startedAt,
+                        finishedAt = System.currentTimeMillis(),
+                        status = RunStatus.CANCELLED,
+                        message = "Cancelled by the user",
+                    ),
+                )
+                throw BackupCancelledException()
+            }
             store.addRun(
                 set.id,
                 RunRecord(
@@ -271,6 +291,6 @@ class BackupEngine(
     }
 
     private fun checkNotCancelled(isCancelled: () -> Boolean) {
-        if (isCancelled()) throw BackupCancelledException()
+        if (isCancelled() || cancellation.isCancelled) throw BackupCancelledException()
     }
 }

@@ -19,6 +19,8 @@ data class BackupSet(
     val token: String = "",
     val enabled: Boolean = true,
     val intervalHours: Int = 24,
+    /** Preferred local hour (0-23) of the first run; the interval repeats from there. */
+    val scheduleHour: Int = 3,
     val requireCharging: Boolean = false,
     val requireUnmetered: Boolean = false,
     val keepVersions: Int = 5,

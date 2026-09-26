@@ -1,5 +1,6 @@
 package com.michalkulik.mkbackup.ui
 
+import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -31,8 +32,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import com.michalkulik.mkbackup.BuildConfig
 import com.michalkulik.mkbackup.R
+import com.michalkulik.mkbackup.core.DeviceAccess
+import com.michalkulik.mkbackup.core.normalizeServerUrl
 
 /**
  * Global defaults. A backup set copies these when it is created, so changing them here never
@@ -41,6 +46,7 @@ import com.michalkulik.mkbackup.R
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    context: Context,
     defaultUrl: String,
     defaultToken: String,
     deviceId: String,
@@ -52,6 +58,14 @@ fun SettingsScreen(
     var url by rememberSaveable(defaultUrl) { mutableStateOf(defaultUrl) }
     var token by rememberSaveable(defaultToken) { mutableStateOf(defaultToken) }
     var saved by remember { mutableStateOf(false) }
+
+    var allFilesAccess by remember { mutableStateOf(DeviceAccess.hasAllFilesAccess(context)) }
+    var ignoringBattery by remember { mutableStateOf(DeviceAccess.isIgnoringBatteryOptimizations(context)) }
+    // Re-check the special grants whenever the user comes back from the system settings screens.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        allFilesAccess = DeviceAccess.hasAllFilesAccess(context)
+        ignoringBattery = DeviceAccess.isIgnoringBatteryOptimizations(context)
+    }
 
     Scaffold(
         topBar = {
@@ -93,9 +107,15 @@ fun SettingsScreen(
                             value = url,
                             onValueChange = { url = it; saved = false },
                             label = { Text(stringResource(R.string.field_server_url)) },
-                            placeholder = { Text("https://backup.example.com") },
+                            placeholder = { Text("backup.example.com:8090") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            stringResource(R.string.field_server_url_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(Modifier.height(8.dp))
                         OutlinedTextField(
@@ -109,14 +129,16 @@ fun SettingsScreen(
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(
                                 onClick = {
-                                    onSave(url.trim().trimEnd('/'), token.trim())
+                                    val normalized = normalizeServerUrl(url)
+                                    url = normalized
+                                    onSave(normalized, token.trim())
                                     saved = true
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                             ) { Text(stringResource(R.string.action_save)) }
 
                             OutlinedButton(
-                                onClick = { onCheck(url.trim().trimEnd('/'), token.trim()) },
+                                onClick = { onCheck(normalizeServerUrl(url), token.trim()) },
                                 enabled = url.isNotBlank(),
                                 modifier = Modifier.fillMaxWidth(),
                             ) { Text(stringResource(R.string.action_check_server)) }
@@ -156,6 +178,41 @@ fun SettingsScreen(
             }
 
             item {
+                PermissionCard(
+                    title = stringResource(R.string.settings_all_files),
+                    description = stringResource(R.string.settings_all_files_description),
+                    granted = allFilesAccess,
+                    grantedLabel = stringResource(R.string.permission_granted),
+                    missingLabel = stringResource(R.string.permission_not_granted),
+                    actionLabel = stringResource(R.string.action_grant_access),
+                    onAction = {
+                        runCatching { context.startActivity(DeviceAccess.allFilesAccessIntent(context)) }
+                    },
+                )
+            }
+
+            item {
+                PermissionCard(
+                    title = stringResource(R.string.settings_battery),
+                    description = stringResource(R.string.settings_battery_description),
+                    granted = ignoringBattery,
+                    grantedLabel = stringResource(R.string.permission_granted),
+                    missingLabel = stringResource(R.string.permission_not_granted),
+                    actionLabel = stringResource(R.string.action_disable_battery_optimization),
+                    onAction = {
+                        val direct = runCatching {
+                            context.startActivity(DeviceAccess.batteryOptimizationIntent(context))
+                        }
+                        if (direct.isFailure) {
+                            runCatching {
+                                context.startActivity(DeviceAccess.batteryOptimizationSettingsIntent())
+                            }
+                        }
+                    },
+                )
+            }
+
+            item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(stringResource(R.string.settings_device), style = MaterialTheme.typography.titleSmall)
@@ -186,6 +243,45 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PermissionCard(
+    title: String,
+    description: String,
+    granted: Boolean,
+    grantedLabel: String,
+    missingLabel: String,
+    actionLabel: String,
+    onAction: () -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                if (granted) grantedLabel else missingLabel,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (granted) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.error
+                },
+            )
+            if (!granted) {
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(onClick = onAction, modifier = Modifier.fillMaxWidth()) {
+                    Text(actionLabel)
                 }
             }
         }

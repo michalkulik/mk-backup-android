@@ -1,8 +1,12 @@
 package com.michalkulik.mkbackup.ui
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -13,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -53,6 +58,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.michalkulik.mkbackup.R
 import com.michalkulik.mkbackup.core.BackupSet
+import com.michalkulik.mkbackup.core.DeviceAccess
+import com.michalkulik.mkbackup.core.normalizeServerUrl
 
 private val StringListSaver: Saver<List<String>, ArrayList<String>> = Saver(
     save = { ArrayList(it) },
@@ -76,6 +83,7 @@ fun SetEditScreen(
     var serverUrl by rememberSaveable(initial.id) { mutableStateOf(initial.serverUrl) }
     var token by rememberSaveable(initial.id) { mutableStateOf(initial.token) }
     var intervalHours by rememberSaveable(initial.id) { mutableStateOf(initial.intervalHours) }
+    var scheduleHour by rememberSaveable(initial.id) { mutableStateOf(initial.scheduleHour) }
     var keepVersions by rememberSaveable(initial.id) { mutableStateOf(initial.keepVersions) }
     var requireCharging by rememberSaveable(initial.id) { mutableStateOf(initial.requireCharging) }
     var requireUnmetered by rememberSaveable(initial.id) { mutableStateOf(initial.requireUnmetered) }
@@ -87,6 +95,49 @@ fun SetEditScreen(
         mutableStateOf(initial.folders)
     }
     var validation by remember { mutableStateOf<Int?>(null) }
+    var showBrowser by rememberSaveable(initial.id) { mutableStateOf(false) }
+
+    // The in-app browser needs broad storage access. "All files access" cannot be granted with a
+    // normal runtime prompt, so the user is sent to the system screen; the browser opens once they
+    // return. On older releases the plain read permission is enough.
+    val allFilesAccessLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) {
+        if (DeviceAccess.hasAllFilesAccess(context)) showBrowser = true
+    }
+    val legacyStoragePermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) showBrowser = true
+    }
+
+    fun browseStorage() {
+        when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ->
+                if (DeviceAccess.hasAllFilesAccess(context)) {
+                    showBrowser = true
+                } else {
+                    runCatching { allFilesAccessLauncher.launch(DeviceAccess.allFilesAccessIntent(context)) }
+                }
+
+            context.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) ==
+                PackageManager.PERMISSION_GRANTED -> showBrowser = true
+
+            else -> legacyStoragePermission.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
+    }
+
+    if (showBrowser) {
+        FolderBrowserDialog(
+            root = Environment.getExternalStorageDirectory(),
+            alreadySelected = folders,
+            onDismiss = { showBrowser = false },
+            onPick = { path ->
+                if (path !in folders) folders = folders + path
+                showBrowser = false
+            },
+        )
+    }
 
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         if (uri != null) {
@@ -122,7 +173,14 @@ fun SetEditScreen(
             )
         },
         bottomBar = {
-            Column(modifier = Modifier.padding(16.dp)) {
+            // navigationBarsPadding keeps the Save button above the system navigation bar; the
+            // Scaffold does not add those insets to a custom bottom bar.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(16.dp),
+            ) {
                 validation?.let {
                     Text(
                         stringResource(it),
@@ -144,9 +202,10 @@ fun SetEditScreen(
                                 initial.copy(
                                     name = name.trim(),
                                     folders = folders,
-                                    serverUrl = serverUrl.trim().trimEnd('/'),
+                                    serverUrl = normalizeServerUrl(serverUrl),
                                     token = token.trim(),
                                     intervalHours = intervalHours,
+                                    scheduleHour = scheduleHour,
                                     keepVersions = keepVersions,
                                     requireCharging = requireCharging,
                                     requireUnmetered = requireUnmetered,
@@ -214,11 +273,24 @@ fun SetEditScreen(
                             }
                         }
                     }
-                    OutlinedButton(onClick = { folderPicker.launch(null) }) {
-                        Icon(Icons.Filled.Add, contentDescription = null)
-                        Spacer(Modifier.size(4.dp))
-                        Text(stringResource(R.string.action_add_folder))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { folderPicker.launch(null) }) {
+                            Icon(Icons.Filled.Add, contentDescription = null)
+                            Spacer(Modifier.size(4.dp))
+                            Text(stringResource(R.string.action_add_folder))
+                        }
+                        OutlinedButton(onClick = { browseStorage() }) {
+                            Icon(Icons.Filled.Folder, contentDescription = null)
+                            Spacer(Modifier.size(4.dp))
+                            Text(stringResource(R.string.action_browse_storage))
+                        }
                     }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        stringResource(R.string.folders_all_access_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
 
@@ -228,9 +300,15 @@ fun SetEditScreen(
                         value = serverUrl,
                         onValueChange = { serverUrl = it },
                         label = { Text(stringResource(R.string.field_server_url)) },
-                        placeholder = { Text("https://backup.example.com") },
+                        placeholder = { Text("backup.example.com:8090") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        stringResource(R.string.field_server_url_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
@@ -255,7 +333,9 @@ fun SetEditScreen(
             item {
                 SectionCard(stringResource(R.string.section_schedule)) {
                     IntervalPicker(intervalHours) { intervalHours = it }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(12.dp))
+                    HourPicker(scheduleHour) { scheduleHour = it }
+                    Spacer(Modifier.height(12.dp))
                     CheckRow(
                         label = stringResource(R.string.schedule_charging),
                         description = stringResource(R.string.schedule_charging_description),
@@ -362,6 +442,41 @@ private fun IntervalPicker(value: Int, onChange: (Int) -> Unit) {
 }
 
 @Composable
+private fun HourPicker(value: Int, onChange: (Int) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Column {
+        Text(
+            stringResource(R.string.field_start_hour),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Spacer(Modifier.height(4.dp))
+        OutlinedButton(onClick = { open = true }) {
+            Text(formatHour(value))
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            (0..23).forEach { hour ->
+                DropdownMenuItem(
+                    text = { Text(formatHour(hour)) },
+                    onClick = {
+                        onChange(hour)
+                        open = false
+                    },
+                )
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            stringResource(R.string.start_hour_description),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** `3` -> `03:00`; locale independent on purpose. */
+fun formatHour(hour: Int): String = "%02d:00".format(hour.coerceIn(0, 23))
+
+@Composable
 private fun KeepVersionsPicker(value: Int, onChange: (Int) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val options = listOf(1, 2, 3, 5, 10, 20, 50)
@@ -388,8 +503,11 @@ private fun KeepVersionsPicker(value: Int, onChange: (Int) -> Unit) {
     }
 }
 
-/** SAF URIs are unreadable; show the trailing folder name instead. */
+/** SAF URIs and absolute paths are unreadable; show the trailing folder name instead. */
 fun friendlyFolderName(uri: String): String {
+    if (!uri.startsWith("content://")) {
+        return uri.trimEnd('/').substringAfterLast('/').ifBlank { uri }
+    }
     val decoded = Uri.decode(uri)
     val marker = decoded.substringAfterLast("tree/", missingDelimiterValue = decoded)
     val tail = marker.substringAfterLast(':', missingDelimiterValue = marker)

@@ -10,13 +10,18 @@ Serwer: <https://github.com/michalkulik/mk-backup-server>
 
 ## Funkcje
 
-* **Wybór folderów** — foldery wybiera się systemowym selektorem (Storage Access Framework), więc
-  aplikacja nie potrzebuje uprawnienia do „wszystkich plików”. Uprawnienie do wybranego katalogu
-  jest zapamiętywane i działa też po restarcie telefonu.
+* **Wybór folderów** — foldery wybiera się systemowym selektorem (Storage Access Framework) albo,
+  po włączeniu w Ustawieniach dostępu do „wszystkich plików”, wbudowaną przeglądarką pamięci —
+  dzięki niej można wskazać także foldery ukryte przed selektorem, np. `Android/data` czy
+  `Downloads`. Uprawnienie do wybranego katalogu jest zapamiętywane i działa po restarcie telefonu.
 * **Cel wysyłki** — adres serwera i token API, osobno dla każdego zestawu (albo domyślnie w
-  ustawieniach).
-* **Harmonogram** — co godzinę, co 3/6/12 godzin, codziennie, co 2 dni lub co tydzień. Dodatkowo
-  „tylko podczas ładowania” i „tylko w sieciach bez limitu”.
+  ustawieniach). Schemat `http://` jest dopisywany automatycznie; wystarczy podać host i port
+  (`backup.example.com:8090`), a `https://` wpisuje się tylko wtedy, gdy serwer używa TLS.
+* **Harmonogram** — co godzinę, co 3/6/12 godzin, codziennie, co 2 dni lub co tydzień, z wyborem
+  **godziny rozpoczęcia** pierwszego uruchomienia. Dodatkowo „tylko podczas ładowania”
+  i „tylko w sieciach bez limitu”.
+* **Uprawnienia systemowe** — w Ustawieniach jest przycisk do włączenia dostępu do wszystkich
+  plików oraz do wyłączenia optymalizacji baterii (żeby Android nie odkładał kopii w tle).
 * **Retencja** — ile najnowszych wersji ma zostać na serwerze; starsze archiwa serwer usuwa sam po
   zatwierdzeniu nowej wersji.
 * **Diff przyrostowy** — aplikacja liczy SHA-256 tylko dla plików, których rozmiar lub data
@@ -82,9 +87,10 @@ Po reinstalacji aplikacji lokalny manifest znika — wtedy aplikacja pobiera man
 * Wykluczenie z optymalizacji baterii jest zalecane, żeby system nie odkładał zadań w tle.
 
 > **Pamięć wewnętrzna:** Android nie daje zwykłej aplikacji dostępu do dowolnych ścieżek. mk-backup
-> używa systemowego selektora katalogów, więc folder wskazujesz raz, a aplikacja dostaje trwałe
-> uprawnienie tylko do niego. Folderów `Android/data` i `Android/obb` nie da się w ten sposób
-> wybrać — to ograniczenie systemu, nie aplikacji.
+> domyślnie używa systemowego selektora katalogów, więc folder wskazujesz raz, a aplikacja dostaje
+> trwałe uprawnienie tylko do niego. Foldery `Android/data` i `Android/obb` są ukryte przed tym
+> selektorem — można je wskazać po włączeniu w Ustawieniach dostępu do „wszystkich plików”
+> i użyciu wbudowanej przeglądarki pamięci. `Android/obb` bywa nadal zablokowany przez system.
 
 ## Budowanie
 
@@ -132,4 +138,8 @@ Testy jednostkowe pokrywają logikę, która decyduje o poprawności przyrostów
   archiwum.
 * WorkManager nie wykonuje zadań częściej niż co 15 minut; najkrótszy dostępny interwał to godzina.
 * Samsung i inne agresywne nakładki mogą odraczać zadania w tle — warto wykluczyć mk-backup z
-  optymalizacji baterii.
+  optymalizacji baterii (przycisk w Ustawieniach).
+* Dostęp do „wszystkich plików” (`MANAGE_EXTERNAL_STORAGE`) nie jest wymagany do zwykłego wyboru
+  folderów przez systemowy selektor; jest potrzebny tylko do folderów ukrytych (np.
+  `Android/data`). Sklepy takie jak Google Play ograniczają to uprawnienie, ale to aplikacja
+  osobista instalowana z APK.

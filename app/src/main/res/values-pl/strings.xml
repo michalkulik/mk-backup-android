@@ -42,6 +42,8 @@
     <string name="schedule_charging_description">Poczekaj z wysyłaniem na podłączenie ładowarki.</string>
     <string name="schedule_unmetered">Tylko w sieciach bez limitu</string>
     <string name="schedule_unmetered_description">Pomiń sieci Wi‑Fi, które system oznacza jako rozliczane.</string>
+    <string name="field_start_hour">Godzina rozpoczęcia</string>
+    <string name="start_hour_description">Pierwsze uruchomienie poczeka do tej godziny; kolejne zachowują wybraną częstotliwość.</string>
 
     <!-- Edycja -->
     <string name="edit_title_new">Nowy zestaw kopii zapasowych</string>
@@ -50,8 +52,11 @@
     <string name="section_folders">Foldery</string>
     <string name="folders_empty">Nie wybrano jeszcze żadnego folderu.</string>
     <string name="action_add_folder">Dodaj folder</string>
+    <string name="action_browse_storage">Przeglądaj pamięć</string>
+    <string name="folders_all_access_hint">„Przeglądaj pamięć” korzysta z dostępu do wszystkich plików, żeby wybrać foldery takie jak Downloads czy Android/data. Włącz go w Ustawieniach.</string>
     <string name="section_server">Serwer docelowy</string>
     <string name="field_server_url">Adres serwera</string>
+    <string name="field_server_url_hint">Możesz pominąć http:// — zostanie dodane automatycznie. Wpisz https://, aby użyć TLS.</string>
     <string name="field_token">Token API</string>
     <string name="action_toggle_token">Pokaż lub ukryj token</string>
     <string name="section_schedule">Harmonogram</string>
@@ -96,6 +101,14 @@
     <string name="settings_default_server">Serwer domyślny</string>
     <string name="settings_default_server_description">Kopiowany do każdego nowego zestawu. Istniejące zestawy zachowują własne wartości.</string>
     <string name="settings_saved">Zapisano.</string>
+    <string name="settings_all_files">Dostęp do wszystkich plików</string>
+    <string name="settings_all_files_description">Potrzebny tylko do folderów ukrytych w systemowym selektorze (np. Android/data). Foldery wybrane systemowo działają bez niego.</string>
+    <string name="settings_battery">Optymalizacja baterii</string>
+    <string name="settings_battery_description">Jeśli aplikacja jest optymalizowana, Android może odraczać lub pomijać zaplanowane kopie. Wykluczenie jej zapewnia punktualność harmonogramu.</string>
+    <string name="permission_granted">Przyznano</string>
+    <string name="permission_not_granted">Nie przyznano</string>
+    <string name="action_grant_access">Przyznaj dostęp</string>
+    <string name="action_disable_battery_optimization">Wyłącz optymalizację</string>
     <string name="action_check_server">Testuj połączenie</string>
     <string name="server_check_checking">Łączenie z serwerem…</string>
     <string name="server_check_ok">Serwer odpowiada (status: %1$s, wersja %2$s).</string>
@@ -119,4 +132,11 @@
     <string name="action_remove">Usuń</string>
     <string name="action_refresh">Odśwież</string>
     <string name="action_clear">Wyczyść</string>
+
+    <!-- Przeglądarka folderów -->
+    <string name="browser_title">Wybierz folder</string>
+    <string name="browser_up">W górę</string>
+    <string name="browser_empty">Brak podfolderów.</string>
+    <string name="browser_use_folder">Użyj tego folderu</string>
+    <string name="browser_already_added">Już dodano</string>
 </resources>
