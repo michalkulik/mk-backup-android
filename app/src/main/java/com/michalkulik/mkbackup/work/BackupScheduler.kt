@@ -19,14 +19,38 @@ import java.util.concurrent.TimeUnit
 /** Turns the stored sets into WorkManager jobs. */
 object BackupScheduler {
 
+    /**
+     * Current scheduling schema. Legacy jobs were anchored to whenever they were first enqueued,
+     * so the selected start hour did not apply; bumping this forces a one-time re-anchor.
+     */
+    const val ANCHOR_VERSION = 1
+
     fun rescheduleAll(context: Context, store: BackupStore) {
         store.sets().forEach { set ->
             if (set.enabled && set.isRunnable) schedule(context, set) else cancel(context, set.id)
         }
     }
 
+    /**
+     * Recreates every job once on the first launch after the upgrade, so an existing set stops
+     * running at its old time and starts honouring the chosen hour. Called from the UI (not from
+     * [com.michalkulik.mkbackup.MkBackupApplication]) so it can never cancel the very backup that
+     * just started the process.
+     */
+    fun reanchorIfNeeded(context: Context, store: BackupStore) {
+        if (store.scheduleAnchorVersion() >= ANCHOR_VERSION) return
+        store.sets().forEach { set ->
+            if (set.enabled && set.isRunnable) {
+                schedule(context, set, reanchor = true)
+            } else {
+                cancel(context, set.id)
+            }
+        }
+        store.setScheduleAnchorVersion(ANCHOR_VERSION)
+    }
+
     /** (Re)creates the periodic job of one set. */
-    fun schedule(context: Context, set: BackupSet) {
+    fun schedule(context: Context, set: BackupSet, reanchor: Boolean = false) {
         val workManager = WorkManager.getInstance(context)
         if (!set.enabled || !set.isRunnable) {
             workManager.cancelUniqueWork(periodicName(set.id))
@@ -48,8 +72,13 @@ object BackupScheduler {
 
         workManager.enqueueUniquePeriodicWork(
             periodicName(set.id),
-            // UPDATE keeps the existing schedule when only unrelated options changed.
-            ExistingPeriodicWorkPolicy.UPDATE,
+            // UPDATE is enough for an unrelated change and keeps the running schedule; the initial
+            // delay is only honoured on a fresh enqueue, so a changed start hour must recreate it.
+            if (reanchor) {
+                ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE
+            } else {
+                ExistingPeriodicWorkPolicy.UPDATE
+            },
             request,
         )
     }

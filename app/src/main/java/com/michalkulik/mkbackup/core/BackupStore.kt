@@ -121,6 +121,20 @@ class BackupStore(context: Context) {
         touch()
     }
 
+    // -------------------------------------------------------------- scheduling
+
+    /**
+     * Schema version of the scheduling anchor. A run created it with an older value and its
+     * periodic job was anchored to the moment it was first enqueued, so the chosen start hour
+     * never took effect; [com.michalkulik.mkbackup.work.BackupScheduler.reanchorIfNeeded] recreates
+     * those jobs once on the first launch after the upgrade.
+     */
+    fun scheduleAnchorVersion(): Int = prefs.getInt(KEY_SCHEDULE_ANCHOR_VERSION, 0)
+
+    fun setScheduleAnchorVersion(version: Int) {
+        prefs.edit().putInt(KEY_SCHEDULE_ANCHOR_VERSION, version).apply()
+    }
+
     // ----------------------------------------------------------------- helpers
 
     private fun touch() {
@@ -148,6 +162,7 @@ class BackupStore(context: Context) {
         private const val KEY_DEFAULT_URL = "default_url"
         private const val KEY_DEFAULT_TOKEN = "default_token"
         private const val KEY_NOTIFICATIONS = "notifications_enabled"
+        private const val KEY_SCHEDULE_ANCHOR_VERSION = "schedule_anchor_version"
         private const val MAX_RUNS = 25
 
         @Volatile

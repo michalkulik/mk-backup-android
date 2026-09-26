@@ -67,7 +67,8 @@ jobs:
 
             Co potrafi:
             * cykliczny (WorkManager) backup wybranych folderów z pamięci wewnętrznej,
-            * wybór godziny rozpoczęcia kopii oraz częstotliwości (godzina / dzień / tydzień),
+            * wybór godziny rozpoczęcia kopii oraz częstotliwości (godzina / dzień / tydzień);
+              zmiana godziny jest teraz naprawdę stosowana (jednorazowa migracja istniejących zadań),
             * wybór folderów systemowym selektorem albo wbudowaną przeglądarką pamięci
               (dostęp do wszystkich plików — np. Downloads, Android/data),
             * przyrostowe wysyłanie — tylko dodane i zmienione pliki, wykrywane po SHA-256,

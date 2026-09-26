@@ -80,16 +80,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val previous = store.set(set.id)
         store.saveSet(set)
         if (set.enabled && set.isRunnable) {
-            // UPDATE alone keeps the old initial delay, so a changed start hour (or interval /
-            // conditions) would not take effect until the next natural run. Recreate the job in
-            // that case; an unrelated edit keeps the existing schedule untouched.
+            // The initial delay is only honoured on a fresh enqueue, so a changed start hour (or
+            // interval / conditions) must recreate the job. An unrelated edit uses UPDATE, which
+            // keeps the schedule and, importantly, does not cancel a run in progress.
             val scheduleChanged = previous == null ||
                 previous.intervalHours != set.intervalHours ||
                 previous.scheduleHour != set.scheduleHour ||
                 previous.requireCharging != set.requireCharging ||
                 previous.requireUnmetered != set.requireUnmetered
-            if (scheduleChanged) BackupScheduler.cancel(getApplication(), set.id)
-            BackupScheduler.schedule(getApplication(), set)
+            BackupScheduler.schedule(getApplication(), set, reanchor = scheduleChanged)
         } else {
             BackupScheduler.cancel(getApplication(), set.id)
         }
