@@ -74,11 +74,11 @@ class BackupEngine(
         isCancelled: () -> Boolean = { false },
     ): RunRecord = withContext(Dispatchers.IO) {
         val startedAt = System.currentTimeMillis()
-        val deviceId = store.deviceId
+        val deviceId = store.serverDeviceId
         val deviceName = store.deviceName()
 
         try {
-            val client = BackupClient(set.serverUrl, set.token)
+            val client = BackupClient(set.serverUrl, set.token, store.previousDeviceIds)
             cancellation.attach(client)
             try {
                 client.use { runInternal(set, client, deviceId, deviceName, onProgress, isCancelled) }

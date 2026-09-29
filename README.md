@@ -39,6 +39,11 @@ Serwer: <https://github.com/michalkulik/mk-backup-server>
   systemowe (sukces lub porażka) ze szczegółami: nazwa zestawu, liczba i rozmiar wysłanych plików,
   nowe / zmienione / usunięte, numer wersji oraz treść błędu. Wysyłanie można wyłączyć przełącznikiem
   w Ustawieniach. Na Androidzie 13+ aplikacja prosi o uprawnienie do powiadomień.
+* **Folder na nazwie urządzenia** — kopie trafiają na serwer do `sets/<nazwa urządzenia>/`, a nie do
+  katalogu z losowym identyfikatorem. Nazwa jest odczytywana z ustawień telefonu (dla Galaxy S23+
+  będzie to `Galaxy S23+`), można ją nadpisać w Ustawieniach. Znakom `/ \ : * ? " < > |` i znaki
+  sterujące są usuwane, a po zmianie nazwy serwer przenosi dotychczasowe kopie razem z historią
+  wersji — nic nie trzeba wysyłać od nowa.
 
 ## Jak to działa
 
@@ -62,6 +67,7 @@ Kluczowe elementy kodu:
 | --- | --- |
 | `core/BackupSet.kt` | model zestawu, wpisu manifestu i przebiegu (`RunRecord`). |
 | `core/BackupStore.kt` | trwałość zestawów, manifestów i historii (JSON w `SharedPreferences`). |
+| `core/DeviceFolder.kt` | nazwa folderu na serwerze wyprowadzona z nazwy urządzenia. |
 | `backup/FileScanner.kt` | przejście po drzewach SAF i policzenie plików. |
 | `backup/DiffEngine.kt` | czysta logika klasyfikacji różnic (pokryta testami). |
 | `backup/BackupEngine.kt` | cały przebieg: skanowanie → hash → diff → wysyłka → zatwierdzenie. |
@@ -133,6 +139,9 @@ Testy jednostkowe pokrywają logikę, która decyduje o poprawności przyrostów
 
 * `DiffEngineTest` — klasyfikacja plików na dodane / zmienione / usunięte / bez zmian.
 * `GlobMatcherTest` — wzorce wykluczeń (`*`, `**`, `?`).
+* `DeviceFolderTest` — czyszczenie nazwy urządzenia na katalog serwera.
+* `BackupClientTest` — format zapytań HTTP: kodowanie folderu, parametr `previous`, treść
+  `POST /sessions` (osobny serwer HTTP na potrzeby testu).
 
 ## Znane ograniczenia
 

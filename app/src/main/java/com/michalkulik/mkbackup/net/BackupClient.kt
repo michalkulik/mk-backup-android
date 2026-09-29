@@ -20,6 +20,7 @@ import okio.gzip
 import okio.source
 import java.io.Closeable
 import java.io.InputStream
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
@@ -35,9 +36,17 @@ class BackupApiException(message: String) : Exception(message)
 class BackupClient(
     baseUrl: String,
     private val token: String = "",
+    /**
+     * Folder ids this device used before, forwarded to the server so it can move an existing
+     * backup to the folder the phone now asks for. Empty on a fresh install: nothing to move.
+     */
+    private val previousDeviceIds: List<String> = emptyList(),
 ) : Closeable {
 
     private val root = normalizeServerUrl(baseUrl)
+
+    /** The previous ids as the server expects them in `?previous=` (newest first). */
+    private val previousQuery: String = previousDeviceIds.filter { it.isNotEmpty() }.joinToString("|")
 
     /**
      * The call currently on the wire, if any. A blocking OkHttp call ignores coroutine
@@ -64,12 +73,13 @@ class BackupClient(
     // ------------------------------------------------------------------- calls
 
     fun health(): HealthResponse =
-        get("/api/v1/health").executeChecked().use { decode(it, HealthResponse.serializer()) }
+        get(pathUrl("/api/v1/health")).executeChecked().use { decode(it, HealthResponse.serializer()) }
 
     fun startSession(request: StartSessionRequest): StartSessionResponse =
-        post("/api/v1/sessions", json.encodeToString(StartSessionRequest.serializer(), request))
-            .executeChecked()
-            .use { decode(it, StartSessionResponse.serializer()) }
+        post(
+            pathUrl("/api/v1/sessions"),
+            json.encodeToString(StartSessionRequest.serializer(), request),
+        ).executeChecked().use { decode(it, StartSessionResponse.serializer()) }
 
     /**
      * Uploads one file. The content is streamed from [openStream] through a gzip encoder, so
@@ -83,8 +93,10 @@ class BackupClient(
         openStream: () -> InputStream,
         onBytes: (Long) -> Unit = {},
     ) {
-        val url = url("/api/v1/sessions/$sessionId/files") { addQueryParameter("path", path) }
-            ?: throw BackupApiException("Invalid server URL")
+        val url = url("/api/v1/sessions/$sessionId/files") {
+            // Same reason as in setsUrl: a `+` in a file name must not come back as a space.
+            addEncodedQueryParameter("path", encodeSegment(path))
+        } ?: throw BackupApiException("Invalid server URL")
         val request = authorized(url)
             .header("X-File-Sha256", sha256)
             .header("X-File-Mode", mode)
@@ -97,17 +109,17 @@ class BackupClient(
 
     fun finishSession(sessionId: String, request: FinishRequest): FinishResponse =
         post(
-            "/api/v1/sessions/$sessionId/finish",
+            pathUrl("/api/v1/sessions/$sessionId/finish"),
             json.encodeToString(FinishRequest.serializer(), request),
         ).executeChecked().use { decode(it, FinishResponse.serializer()) }
 
     fun versions(deviceId: String, setId: String): List<RemoteVersion> =
-        get("/api/v1/sets/$deviceId/$setId/versions").executeChecked()
+        get(setsUrl(deviceId, setId, "versions")).executeChecked()
             .use { decode(it, VersionListResponse.serializer()) }
             .versions
 
     fun deleteVersion(deviceId: String, setId: String, version: Int) {
-        delete("/api/v1/sets/$deviceId/$setId/versions/$version").executeChecked().close()
+        delete(setsUrl(deviceId, setId, "versions", version.toString())).executeChecked().close()
     }
 
     /**
@@ -115,7 +127,7 @@ class BackupClient(
      * manifest is gone but the server still knows exactly which files it has.
      */
     fun manifest(deviceId: String, setId: String): Map<String, ManifestEntry> =
-        get("/api/v1/sets/$deviceId/$setId/manifest").executeChecked()
+        get(setsUrl(deviceId, setId, "manifest")).executeChecked()
             .use { decode(it, ManifestResponse.serializer()) }
             .entries
             .associate { entry ->
@@ -142,15 +154,41 @@ class BackupClient(
 
     // ---------------------------------------------------------------- plumbing
 
-    private fun get(path: String): Request = authorized(resolve(path)).get().build()
+    private fun get(url: HttpUrl): Request = authorized(url).get().build()
 
-    private fun delete(path: String): Request = authorized(resolve(path)).delete().build()
+    private fun delete(url: HttpUrl): Request = authorized(url).delete().build()
 
-    private fun post(path: String, body: String): Request =
-        authorized(resolve(path)).post(body.toRequestBody(jsonMedia)).build()
+    private fun post(url: HttpUrl, body: String): Request =
+        authorized(url).post(body.toRequestBody(jsonMedia)).build()
 
-    private fun resolve(path: String): HttpUrl =
+    /** `/api/v1/…` addressed by path, for the calls whose segments the server generates. */
+    private fun pathUrl(path: String): HttpUrl =
         url(path) ?: throw BackupApiException("Invalid server URL: $root$path")
+
+    /**
+     * `/api/v1/sets/{device}/{set}/…`, plus any trailing segments.
+     *
+     * The ids are readable now (`Galaxy S23+`), so each one is percent-encoded exactly once and
+     * handed to OkHttp as already encoded: a raw space must not reach the wire, and the `+` in a
+     * product name must survive as a literal plus instead of being read as a space.
+     */
+    private fun setsUrl(deviceId: String, setId: String, vararg tail: String): HttpUrl {
+        val builder = "$root/api/v1/sets".toHttpUrlOrNull()?.newBuilder()
+            ?: throw BackupApiException("Invalid server URL: $root")
+        builder.addEncodedPathSegment(encodeSegment(deviceId))
+        builder.addEncodedPathSegment(encodeSegment(setId))
+        tail.forEach { builder.addEncodedPathSegment(encodeSegment(it)) }
+        // Encoded on purpose: the query string is parsed with `+` meaning space, so a `+` left
+        // raw (as in `Galaxy S23+`) would arrive as `Galaxy S23 ` and match nothing.
+        if (previousQuery.isNotEmpty()) {
+            builder.addEncodedQueryParameter("previous", encodeSegment(previousQuery))
+        }
+        return builder.build()
+    }
+
+    /** Form encoding writes a space as `+`, which in a path segment means a literal plus. */
+    private fun encodeSegment(value: String): String =
+        URLEncoder.encode(value, "UTF-8").replace("+", "%20")
 
     private fun authorized(url: HttpUrl): Request.Builder =
         Request.Builder().url(url).apply {

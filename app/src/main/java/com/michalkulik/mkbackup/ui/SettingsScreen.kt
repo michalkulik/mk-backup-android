@@ -54,17 +54,24 @@ fun SettingsScreen(
     context: Context,
     defaultUrl: String,
     defaultToken: String,
-    deviceId: String,
+    deviceFolder: String,
+    deviceName: String,
     checkState: ServerCheckState,
     notificationsEnabled: Boolean,
     onNotificationsChange: (Boolean) -> Unit,
     onSave: (String, String) -> Unit,
     onCheck: (String, String) -> Unit,
+    onSaveFolder: (String) -> String,
     onBack: () -> Unit,
 ) {
     var url by rememberSaveable(defaultUrl) { mutableStateOf(defaultUrl) }
     var token by rememberSaveable(defaultToken) { mutableStateOf(defaultToken) }
     var saved by remember { mutableStateOf(false) }
+
+    // Keyed on the stored value: saving a name that sanitises differently snaps the field to what
+    // the server will actually see.
+    var folder by rememberSaveable(deviceFolder) { mutableStateOf(deviceFolder) }
+    var folderSaved by remember { mutableStateOf(false) }
 
     var allFilesAccess by remember { mutableStateOf(DeviceAccess.hasAllFilesAccess(context)) }
     var ignoringBattery by remember { mutableStateOf(DeviceAccess.isIgnoringBatteryOptimizations(context)) }
@@ -255,13 +262,52 @@ fun SettingsScreen(
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(stringResource(R.string.settings_device), style = MaterialTheme.typography.titleSmall)
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(4.dp))
                         Text(
-                            stringResource(R.string.settings_device_id),
+                            stringResource(R.string.settings_device_folder_description),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Text(deviceId, style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = folder,
+                            onValueChange = { folder = it; folderSaved = false },
+                            label = { Text(stringResource(R.string.settings_device_folder_label)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            stringResource(R.string.settings_device_folder_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                folder = onSaveFolder(folder)
+                                folderSaved = true
+                            },
+                            enabled = folder.isNotBlank(),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(stringResource(R.string.action_save)) }
+
+                        if (folderSaved) {
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                stringResource(R.string.settings_saved),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            stringResource(R.string.settings_device_name),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(deviceName, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }

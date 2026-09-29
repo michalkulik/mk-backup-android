@@ -13,6 +13,12 @@ data class StartSessionRequest(
     val setName: String,
     val baseVersion: Int,
     val keepVersions: Int,
+    /**
+     * Folder ids this device used before, newest first. The server moves the data across the
+     * change (random id → readable device name, or a rename made in Settings) the first time it
+     * sees them, so the version history is not left behind in an orphaned directory.
+     */
+    val previousDeviceIds: List<String> = emptyList(),
 )
 
 @Serializable

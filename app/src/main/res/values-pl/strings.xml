@@ -116,7 +116,10 @@
     <string name="server_check_ok">Serwer odpowiada (status: %1$s, wersja %2$s).</string>
     <string name="server_check_failed">Połączenie nieudane: %1$s</string>
     <string name="settings_device">To urządzenie</string>
-    <string name="settings_device_id">Identyfikator porządkujący kopie na serwerze:</string>
+    <string name="settings_device_folder_description">Kopie trafiają na serwer do sets/&lt;ten folder&gt;/, więc nazwa folderu od razu mówi, z którego telefonu pochodzą. Domyślnie jest to nazwa urządzenia z ustawień telefonu.</string>
+    <string name="settings_device_folder_label">Nazwa folderu</string>
+    <string name="settings_device_folder_hint">Zmiana nazwy przenosi istniejące kopie razem z historią wersji do nowego folderu na serwerze.</string>
+    <string name="settings_device_name">Nazwa urządzenia raportowana przez Androida:</string>
     <string name="settings_about">O aplikacji</string>
     <string name="settings_version">mk-backup %1$s</string>
     <string name="settings_about_description">Przyrostowe kopie wybranych folderów, wysyłane na własny serwer i przechowywane tam jako jedno archiwum na wersję.</string>

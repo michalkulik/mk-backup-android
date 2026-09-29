@@ -35,7 +35,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val store = BackupStore.get(application)
 
-    val deviceId: String = store.deviceId
+    /**
+     * Folder this device's backups live in on the server. Derived from the phone's device name and
+     * editable in Settings, so it recomputes as soon as the user saves a new one.
+     */
+    val deviceFolder: StateFlow<String> = store.revision
+        .map { store.serverDeviceId }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, store.serverDeviceId)
 
     /** Backup sets, refreshed whenever anything is written to the store. */
     val sets: StateFlow<List<BackupSet>> = store.revision
@@ -130,6 +136,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setNotificationsEnabled(enabled: Boolean) = store.setNotificationsEnabled(enabled)
 
+    /** Renames the server folder; the store remembers the old id so the server can move the data.
+     *  Returns the name as stored. */
+    fun setDeviceFolder(name: String): String = store.setDeviceFolderName(name)
+
+    /** The name Android reports for this phone, shown as the origin of the folder name. */
+    fun deviceName(): String = store.deviceName()
+
     // ----------------------------------------------------------------- server
 
     fun refreshVersions(set: BackupSet) {
@@ -137,8 +150,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    BackupClient(set.serverUrl, set.token).use { client ->
-                        client.versions(deviceId, set.id)
+                    BackupClient(set.serverUrl, set.token, store.previousDeviceIds).use { client ->
+                        client.versions(store.serverDeviceId, set.id)
                     }
                 }
             }
@@ -155,8 +168,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 runCatching {
-                    BackupClient(set.serverUrl, set.token).use { client ->
-                        client.deleteVersion(deviceId, set.id, version)
+                    BackupClient(set.serverUrl, set.token, store.previousDeviceIds).use { client ->
+                        client.deleteVersion(store.serverDeviceId, set.id, version)
                     }
                 }
             }

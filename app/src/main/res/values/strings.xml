@@ -116,7 +116,10 @@
     <string name="server_check_ok">Server is up (status: %1$s, version %2$s).</string>
     <string name="server_check_failed">Connection failed: %1$s</string>
     <string name="settings_device">This device</string>
-    <string name="settings_device_id">Identifier used to namespace your backups on the server:</string>
+    <string name="settings_device_folder_description">Backups land on the server under sets/&lt;this folder&gt;/, so the folder name tells you which phone the copies came from. It defaults to the device name from the phone settings.</string>
+    <string name="settings_device_folder_label">Folder name</string>
+    <string name="settings_device_folder_hint">Renaming it moves the existing backups, together with their version history, to the new folder on the server.</string>
+    <string name="settings_device_name">Device name reported by Android:</string>
     <string name="settings_about">About</string>
     <string name="settings_version">mk-backup %1$s</string>
     <string name="settings_about_description">Incremental backups of the folders you choose, uploaded to your own server and kept there as a single archive per version.</string>

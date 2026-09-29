@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
-import java.util.UUID
 
 /**
  * Persistence for backup sets, their manifests and the run history.
@@ -84,18 +83,73 @@ class BackupStore(context: Context) {
 
     // ------------------------------------------------------- device identity
 
-    /** Stable per-installation identifier used to namespace backups on the server. */
-    val deviceId: String
-        get() = prefs.getString(KEY_DEVICE_ID, null) ?: UUID.randomUUID().toString().also {
-            prefs.edit().putString(KEY_DEVICE_ID, it).apply()
-        }
-
-    /** Human readable name reported to the server, Android's configured device name when present. */
+    /**
+     * Human readable name reported to the server, Android's configured device name when present.
+     * This is what "About phone" shows, e.g. `Galaxy S23+`.
+     */
     fun deviceName(): String = runCatching {
         Settings.Global.getString(appContext.contentResolver, Settings.Global.DEVICE_NAME)
     }.getOrNull()?.takeIf { it.isNotBlank() }
         ?: runCatching { android.os.Build.MODEL }.getOrNull()?.takeIf { it.isNotBlank() }
-        ?: "Android device"
+        ?: FALLBACK_DEVICE_NAME
+
+    /**
+     * The id the server keys everything by: the folder holding this phone's backups. Defaults to
+     * the device name, so `sets/Galaxy S23+/…` instead of `sets/<random uuid>/…`.
+     */
+    val serverDeviceId: String
+        get() = ensureDeviceFolder()
+
+    /**
+     * Ids this device used before, newest first: the original random id and any folder name the
+     * user replaced. Every request carries them so the server can move the data across a rename
+     * instead of starting an empty folder next to the old one.
+     */
+    val previousDeviceIds: List<String>
+        get() {
+            ensureDeviceFolder()
+            return prefs.getString(KEY_PREVIOUS_DEVICE_IDS, "").orEmpty()
+                .split(ID_SEPARATOR)
+                .filter { it.isNotEmpty() }
+        }
+
+    /** Changes the server folder. The outgoing name is remembered so the data can be moved.
+     *  Returns the name as stored, so callers can show what the server will actually see. */
+    fun setDeviceFolderName(raw: String): String {
+        val current = ensureDeviceFolder()
+        val next = sanitizeDeviceFolder(raw)
+            .ifEmpty { sanitizeDeviceFolder(deviceName()) }
+            .ifEmpty { current }
+        if (next == current) return current
+        val history = (listOf(current) + previousDeviceIds)
+            .distinct()
+            .take(MAX_PREVIOUS_IDS)
+            .joinToString(ID_SEPARATOR.toString())
+        prefs.edit()
+            .putString(KEY_SERVER_DEVICE_ID, next)
+            .putString(KEY_PREVIOUS_DEVICE_IDS, history)
+            .apply()
+        touch()
+        return next
+    }
+
+    /**
+     * Reads (and, on the first run of this version, creates) the folder name.
+     *
+     * The original random id is remembered as the first previous id — that is what tells the
+     * server to move the backups written before the folder was named after the device. It is
+     * read without being generated: on a fresh install there is nothing on the server to move.
+     */
+    private fun ensureDeviceFolder(): String {
+        prefs.getString(KEY_SERVER_DEVICE_ID, null)?.let { return it }
+        val folder = sanitizeDeviceFolder(deviceName()).ifEmpty { FALLBACK_DEVICE_NAME }
+        val legacy = prefs.getString(KEY_LEGACY_DEVICE_ID, null)
+        prefs.edit()
+            .putString(KEY_SERVER_DEVICE_ID, folder)
+            .putString(KEY_PREVIOUS_DEVICE_IDS, legacy.orEmpty())
+            .apply()
+        return folder
+    }
 
     // ------------------------------------------------------- global defaults
 
@@ -158,12 +212,22 @@ class BackupStore(context: Context) {
     companion object {
         private const val PREFS = "mkbackup"
         private const val KEY_SETS = "sets"
-        private const val KEY_DEVICE_ID = "device_id"
+        private const val KEY_LEGACY_DEVICE_ID = "device_id"
+        private const val KEY_SERVER_DEVICE_ID = "server_device_id"
+        private const val KEY_PREVIOUS_DEVICE_IDS = "previous_device_ids"
         private const val KEY_DEFAULT_URL = "default_url"
         private const val KEY_DEFAULT_TOKEN = "default_token"
         private const val KEY_NOTIFICATIONS = "notifications_enabled"
         private const val KEY_SCHEDULE_ANCHOR_VERSION = "schedule_anchor_version"
         private const val MAX_RUNS = 25
+
+        /** Separator for the remembered folder ids; stripped from names, so it cannot clash. */
+        private const val ID_SEPARATOR = '|'
+
+        /** How many replaced folder names are still offered to the server for a move. */
+        private const val MAX_PREVIOUS_IDS = 5
+
+        private const val FALLBACK_DEVICE_NAME = "Android device"
 
         @Volatile
         private var instance: BackupStore? = null

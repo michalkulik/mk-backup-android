@@ -59,6 +59,7 @@ fun MkBackupApp(context: Context, viewModel: MainViewModel = viewModel()) {
     val versions by viewModel.versions.collectAsStateWithLifecycle()
     val serverCheck by viewModel.serverCheck.collectAsStateWithLifecycle()
     val notificationsEnabled by viewModel.notificationsEnabled.collectAsStateWithLifecycle()
+    val deviceFolder by viewModel.deviceFolder.collectAsStateWithLifecycle()
 
     // The app navigates with its own tiny screen state, so the system Back gesture/button has to
     // be wired to it explicitly. Without this, Back on any non-root screen finishes the activity
@@ -94,12 +95,14 @@ fun MkBackupApp(context: Context, viewModel: MainViewModel = viewModel()) {
             context = context,
             defaultUrl = viewModel.defaultServerUrl(),
             defaultToken = viewModel.defaultToken(),
-            deviceId = viewModel.deviceId,
+            deviceFolder = deviceFolder,
+            deviceName = viewModel.deviceName(),
             checkState = serverCheck,
             notificationsEnabled = notificationsEnabled,
             onNotificationsChange = viewModel::setNotificationsEnabled,
             onSave = viewModel::saveDefaults,
             onCheck = viewModel::checkServer,
+            onSaveFolder = viewModel::setDeviceFolder,
             onBack = {
                 viewModel.clearServerCheck()
                 screen = Screen.List
