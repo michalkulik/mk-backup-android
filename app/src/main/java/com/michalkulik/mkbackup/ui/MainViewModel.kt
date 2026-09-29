@@ -145,15 +145,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ----------------------------------------------------------------- server
 
+    /** Client for [set], addressed under the folder this particular server uses. */
+    private fun clientFor(set: BackupSet): BackupClient = BackupClient(
+        set.serverUrl,
+        set.token,
+        folderId = store.serverDeviceId,
+        legacyId = store::legacyDeviceId,
+        previousIds = store.previousDeviceIds,
+    )
+
     fun refreshVersions(set: BackupSet) {
         _versions.value = _versions.value + (set.id to VersionsState.Loading)
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching {
-                    BackupClient(set.serverUrl, set.token, store.previousDeviceIds).use { client ->
-                        client.versions(store.serverDeviceId, set.id)
-                    }
-                }
+                runCatching { clientFor(set).use { it.versions(set.id) } }
             }
             _versions.value = _versions.value + (
                 set.id to result.fold(
@@ -168,9 +173,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 runCatching {
-                    BackupClient(set.serverUrl, set.token, store.previousDeviceIds).use { client ->
-                        client.deleteVersion(store.serverDeviceId, set.id, version)
-                    }
+                    clientFor(set).use { it.deleteVersion(set.id, version) }
                 }
             }
             refreshVersions(set)

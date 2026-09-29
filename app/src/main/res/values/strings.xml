@@ -118,7 +118,7 @@
     <string name="settings_device">This device</string>
     <string name="settings_device_folder_description">Backups land on the server under sets/&lt;this folder&gt;/, so the folder name tells you which phone the copies came from. It defaults to the device name from the phone settings.</string>
     <string name="settings_device_folder_label">Folder name</string>
-    <string name="settings_device_folder_hint">Renaming it moves the existing backups, together with their version history, to the new folder on the server.</string>
+    <string name="settings_device_folder_hint">Renaming it moves the existing backups, together with their version history, to the new folder on the server. Needs mk-backup-server 1.2.0 or newer; on an older server the backups keep going to the folder that server already uses.</string>
     <string name="settings_device_name">Device name reported by Android:</string>
     <string name="settings_about">About</string>
     <string name="settings_version">mk-backup %1$s</string>

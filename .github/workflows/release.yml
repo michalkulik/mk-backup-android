@@ -81,7 +81,8 @@ jobs:
             * niezawodne zatrzymanie kopii nawet podczas łączenia z błędnym adresem serwera,
             * kopie trafiają na serwer do folderu o nazwie urządzenia z ustawień telefonu
               (np. `sets/Galaxy S23+/…`) — nazwę można zmienić w Ustawieniach, a istniejące
-              kopie serwer przenosi razem z historią wersji,
+              kopie serwer przenosi razem z historią wersji (wymaga serwera
+              mk-backup-server v1.2.0; ze starszym serwerem aplikacja działa jak dotąd),
             * natywny interfejs Material 3.
 
             Instalacja: pobierz plik `mk-backup-${{ github.ref_name }}.apk` i zainstaluj go

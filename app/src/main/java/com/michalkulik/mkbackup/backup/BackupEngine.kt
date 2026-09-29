@@ -74,14 +74,19 @@ class BackupEngine(
         isCancelled: () -> Boolean = { false },
     ): RunRecord = withContext(Dispatchers.IO) {
         val startedAt = System.currentTimeMillis()
-        val deviceId = store.serverDeviceId
         val deviceName = store.deviceName()
 
         try {
-            val client = BackupClient(set.serverUrl, set.token, store.previousDeviceIds)
+            val client = BackupClient(
+                set.serverUrl,
+                set.token,
+                folderId = store.serverDeviceId,
+                legacyId = store::legacyDeviceId,
+                previousIds = store.previousDeviceIds,
+            )
             cancellation.attach(client)
             try {
-                client.use { runInternal(set, client, deviceId, deviceName, onProgress, isCancelled) }
+                client.use { runInternal(set, client, deviceName, onProgress, isCancelled) }
             } finally {
                 cancellation.detach()
             }
@@ -127,7 +132,6 @@ class BackupEngine(
     private fun runInternal(
         set: BackupSet,
         client: BackupClient,
-        deviceId: String,
         deviceName: String,
         onProgress: (BackupProgress) -> Unit,
         isCancelled: () -> Boolean,
@@ -148,7 +152,7 @@ class BackupEngine(
             // Fresh install: rebuild the base from what the server already holds, otherwise the
             // first run after a reinstall would upload everything again.
             base = runCatching {
-                BackupManifest(set.id, entries = client.manifest(deviceId, set.id))
+                BackupManifest(set.id, entries = client.manifest(set.id))
             }.getOrDefault(base)
         }
         val previous: Map<String, ManifestEntry> = base.entries
@@ -200,7 +204,9 @@ class BackupEngine(
         // ---- 4. upload -----------------------------------------------------
         val session = client.startSession(
             StartSessionRequest(
-                deviceId = deviceId,
+                // Resolved here, not before: against an older server this is still the random id
+                // the data has always lived under, so nothing is ever split across two folders.
+                deviceId = client.deviceId(),
                 deviceName = deviceName,
                 setId = set.id,
                 setName = set.name,

@@ -118,7 +118,7 @@
     <string name="settings_device">To urządzenie</string>
     <string name="settings_device_folder_description">Kopie trafiają na serwer do sets/&lt;ten folder&gt;/, więc nazwa folderu od razu mówi, z którego telefonu pochodzą. Domyślnie jest to nazwa urządzenia z ustawień telefonu.</string>
     <string name="settings_device_folder_label">Nazwa folderu</string>
-    <string name="settings_device_folder_hint">Zmiana nazwy przenosi istniejące kopie razem z historią wersji do nowego folderu na serwerze.</string>
+    <string name="settings_device_folder_hint">Zmiana nazwy przenosi istniejące kopie razem z historią wersji do nowego folderu na serwerze. Wymaga mk-backup-server 1.2.0 lub nowszego; przy starszym serwerze kopie nadal trafiają do folderu, którego ten serwer już używa.</string>
     <string name="settings_device_name">Nazwa urządzenia raportowana przez Androida:</string>
     <string name="settings_about">O aplikacji</string>
     <string name="settings_version">mk-backup %1$s</string>

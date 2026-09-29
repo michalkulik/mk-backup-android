@@ -37,16 +37,46 @@ class BackupClient(
     baseUrl: String,
     private val token: String = "",
     /**
+     * Readable folder this device's backups belong in (`Galaxy S23+`). Used only against servers
+     * that understand it — see [namedDeviceFolders].
+     */
+    private val folderId: String = "",
+    /**
+     * The random id used before folders were named after the device, created on first use. It is
+     * what an older server still holds the backups under, so it is only asked for when needed.
+     */
+    private val legacyId: () -> String = { "" },
+    /**
      * Folder ids this device used before, forwarded to the server so it can move an existing
      * backup to the folder the phone now asks for. Empty on a fresh install: nothing to move.
      */
-    private val previousDeviceIds: List<String> = emptyList(),
+    private val previousIds: List<String> = emptyList(),
 ) : Closeable {
 
     private val root = normalizeServerUrl(baseUrl)
 
+    /**
+     * Whether this server stores backups under the readable folder name (mk-backup-server 1.2.0).
+     *
+     * Negotiated once per client from the version the server reports, and never guessed: a server
+     * that predates readable folders keeps being addressed by the original random id, exactly as
+     * before, so installing this version alone cannot split an existing backup over two folders.
+     * A failed probe is not swallowed — the call that needed it would fail the same way, and
+     * silently picking the wrong id would be worse than an honest connection error.
+     */
+    private val namedDeviceFolders: Boolean by lazy {
+        health().version.atLeast(NAMED_FOLDERS_SINCE)
+    }
+
+    /**
+     * The folder id to use against this server: the readable name where it is supported, and the
+     * random id it has always known everywhere else.
+     */
+    fun deviceId(): String =
+        if (namedDeviceFolders) folderId.ifEmpty { legacyId() } else legacyId().ifEmpty { folderId }
+
     /** The previous ids as the server expects them in `?previous=` (newest first). */
-    private val previousQuery: String = previousDeviceIds.filter { it.isNotEmpty() }.joinToString("|")
+    private fun previousQuery(): String = previousIds.filter { it.isNotEmpty() }.joinToString("|")
 
     /**
      * The call currently on the wire, if any. A blocking OkHttp call ignores coroutine
@@ -113,21 +143,21 @@ class BackupClient(
             json.encodeToString(FinishRequest.serializer(), request),
         ).executeChecked().use { decode(it, FinishResponse.serializer()) }
 
-    fun versions(deviceId: String, setId: String): List<RemoteVersion> =
-        get(setsUrl(deviceId, setId, "versions")).executeChecked()
+    fun versions(setId: String): List<RemoteVersion> =
+        get(setsUrl(setId, "versions")).executeChecked()
             .use { decode(it, VersionListResponse.serializer()) }
             .versions
 
-    fun deleteVersion(deviceId: String, setId: String, version: Int) {
-        delete(setsUrl(deviceId, setId, "versions", version.toString())).executeChecked().close()
+    fun deleteVersion(setId: String, version: Int) {
+        delete(setsUrl(setId, "versions", version.toString())).executeChecked().close()
     }
 
     /**
      * Manifest the server currently holds. Used as the diff base after a reinstall, when the local
      * manifest is gone but the server still knows exactly which files it has.
      */
-    fun manifest(deviceId: String, setId: String): Map<String, ManifestEntry> =
-        get(setsUrl(deviceId, setId, "manifest")).executeChecked()
+    fun manifest(setId: String): Map<String, ManifestEntry> =
+        get(setsUrl(setId, "manifest")).executeChecked()
             .use { decode(it, ManifestResponse.serializer()) }
             .entries
             .associate { entry ->
@@ -166,22 +196,23 @@ class BackupClient(
         url(path) ?: throw BackupApiException("Invalid server URL: $root$path")
 
     /**
-     * `/api/v1/sets/{device}/{set}/…`, plus any trailing segments.
+     * `/api/v1/sets/{folder}/{set}/…`, plus any trailing segments.
      *
      * The ids are readable now (`Galaxy S23+`), so each one is percent-encoded exactly once and
      * handed to OkHttp as already encoded: a raw space must not reach the wire, and the `+` in a
      * product name must survive as a literal plus instead of being read as a space.
      */
-    private fun setsUrl(deviceId: String, setId: String, vararg tail: String): HttpUrl {
+    private fun setsUrl(setId: String, vararg tail: String): HttpUrl {
         val builder = "$root/api/v1/sets".toHttpUrlOrNull()?.newBuilder()
             ?: throw BackupApiException("Invalid server URL: $root")
-        builder.addEncodedPathSegment(encodeSegment(deviceId))
+        builder.addEncodedPathSegment(encodeSegment(deviceId()))
         builder.addEncodedPathSegment(encodeSegment(setId))
         tail.forEach { builder.addEncodedPathSegment(encodeSegment(it)) }
-        // Encoded on purpose: the query string is parsed with `+` meaning space, so a `+` left
-        // raw (as in `Galaxy S23+`) would arrive as `Galaxy S23 ` and match nothing.
-        if (previousQuery.isNotEmpty()) {
-            builder.addEncodedQueryParameter("previous", encodeSegment(previousQuery))
+        // Only a server that understands folders has any use for the old ids. The query string is
+        // parsed with `+` meaning space, hence the encoding: a plus left raw in `Galaxy S23+`
+        // would come back as `Galaxy S23 ` and match nothing.
+        if (namedDeviceFolders && previousQuery().isNotEmpty()) {
+            builder.addEncodedQueryParameter("previous", encodeSegment(previousQuery()))
         }
         return builder.build()
     }
@@ -262,5 +293,24 @@ class BackupClient(
     private companion object {
         /** Short enough that a mistyped host surfaces quickly instead of hanging the run. */
         const val CONNECT_TIMEOUT_SECONDS = 15L
+
+        /** First server version that stores backups under the readable device folder. */
+        const val NAMED_FOLDERS_SINCE = "1.2.0"
     }
+}
+
+/**
+ * `major.minor.patch >= required`, ignoring anything that is not a number.
+ *
+ * The version is the only signal that the server knows about readable folders, so an empty or
+ * unexpected value must not be read as "new enough": the safe answer is the old behaviour.
+ */
+private fun String.atLeast(required: String): Boolean {
+    val actual = split('.').map { it.trim().toIntOrNull() ?: 0 }
+    val wanted = required.split('.').map { it.trim().toIntOrNull() ?: 0 }
+    for (index in wanted.indices) {
+        val have = actual.getOrNull(index) ?: 0
+        if (have != wanted[index]) return have > wanted[index]
+    }
+    return true
 }

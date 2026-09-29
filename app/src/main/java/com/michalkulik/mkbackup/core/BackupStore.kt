@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import java.util.UUID
 
 /**
  * Persistence for backup sets, their manifests and the run history.
@@ -101,17 +102,29 @@ class BackupStore(context: Context) {
         get() = ensureDeviceFolder()
 
     /**
-     * Ids this device used before, newest first: the original random id and any folder name the
-     * user replaced. Every request carries them so the server can move the data across a rename
-     * instead of starting an empty folder next to the old one.
+     * Ids this device may have data under, newest first: the random id used before folders were
+     * named after the device, then any folder name the user replaced. Every request carries them
+     * so the server can move the data across a rename instead of starting an empty folder next to
+     * the old one. Read from storage on each call, so an id created later is picked up too.
      */
     val previousDeviceIds: List<String>
-        get() {
-            ensureDeviceFolder()
-            return prefs.getString(KEY_PREVIOUS_DEVICE_IDS, "").orEmpty()
-                .split(ID_SEPARATOR)
-                .filter { it.isNotEmpty() }
-        }
+        get() = (
+            listOfNotNull(prefs.getString(KEY_LEGACY_DEVICE_ID, null)) + storedIdList(KEY_PREVIOUS_DEVICE_IDS)
+            ).distinct().take(MAX_PREVIOUS_IDS + 1)
+
+    /**
+     * The random id this app used before folders were named after the device.
+     *
+     * Created on demand, because it is only needed when a server too old for readable folder names
+     * has to be addressed exactly as it was before — see `BackupClient.deviceId()`. Reading it for
+     * [previousDeviceIds] deliberately does not create it: an install that always talked to a new
+     * server has nothing under it.
+     */
+    val legacyDeviceId: String
+        get() = prefs.getString(KEY_LEGACY_DEVICE_ID, null)
+            ?: UUID.randomUUID().toString().also {
+                prefs.edit().putString(KEY_LEGACY_DEVICE_ID, it).apply()
+            }
 
     /** Changes the server folder. The outgoing name is remembered so the data can be moved.
      *  Returns the name as stored, so callers can show what the server will actually see. */
@@ -121,13 +134,12 @@ class BackupStore(context: Context) {
             .ifEmpty { sanitizeDeviceFolder(deviceName()) }
             .ifEmpty { current }
         if (next == current) return current
-        val history = (listOf(current) + previousDeviceIds)
+        val history = (listOf(current) + storedIdList(KEY_PREVIOUS_DEVICE_IDS))
             .distinct()
             .take(MAX_PREVIOUS_IDS)
-            .joinToString(ID_SEPARATOR.toString())
         prefs.edit()
             .putString(KEY_SERVER_DEVICE_ID, next)
-            .putString(KEY_PREVIOUS_DEVICE_IDS, history)
+            .putString(KEY_PREVIOUS_DEVICE_IDS, history.joinToString(ID_SEPARATOR.toString()))
             .apply()
         touch()
         return next
@@ -136,20 +148,19 @@ class BackupStore(context: Context) {
     /**
      * Reads (and, on the first run of this version, creates) the folder name.
      *
-     * The original random id is remembered as the first previous id — that is what tells the
-     * server to move the backups written before the folder was named after the device. It is
-     * read without being generated: on a fresh install there is nothing on the server to move.
+     * The name is stored once so that renaming the phone does not silently move the backups to a
+     * new directory; the folder can still be changed by hand in Settings, which is what
+     * [setDeviceFolderName] records.
      */
     private fun ensureDeviceFolder(): String {
         prefs.getString(KEY_SERVER_DEVICE_ID, null)?.let { return it }
         val folder = sanitizeDeviceFolder(deviceName()).ifEmpty { FALLBACK_DEVICE_NAME }
-        val legacy = prefs.getString(KEY_LEGACY_DEVICE_ID, null)
-        prefs.edit()
-            .putString(KEY_SERVER_DEVICE_ID, folder)
-            .putString(KEY_PREVIOUS_DEVICE_IDS, legacy.orEmpty())
-            .apply()
+        prefs.edit().putString(KEY_SERVER_DEVICE_ID, folder).apply()
         return folder
     }
+
+    private fun storedIdList(key: String): List<String> =
+        prefs.getString(key, "").orEmpty().split(ID_SEPARATOR).filter { it.isNotEmpty() }
 
     // ------------------------------------------------------- global defaults
 

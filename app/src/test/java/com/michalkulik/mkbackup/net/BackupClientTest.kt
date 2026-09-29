@@ -16,12 +16,21 @@ import java.net.URLDecoder
  * The name is human readable (`Galaxy S23+`), so the interesting part is not the JSON but the
  * encoding: the space must reach the server as `%20`, the `+` must not be readable as a space in
  * either the path or the query, and the previous ids must survive a round trip through the query
- * string unchanged. Everything here is checked against the request exactly as it goes out.
+ * string unchanged. The other half is the negotiation: a server too old for readable folders must
+ * keep getting the random id it has always known, so installing the app alone can never leave a
+ * backup split across two directories. Everything here is checked against the request exactly as
+ * it goes out.
  */
 class BackupClientTest {
 
     private lateinit var server: HttpServer
     private var baseUrl: String = ""
+
+    /** Version the stub reports from `GET /api/v1/health`. */
+    private var healthVersion: String = "1.2.0"
+
+    /** When set, `GET /api/v1/health` answers with 500 instead of a version. */
+    private var healthFails: Boolean = false
 
     private var method: String = ""
     private var rawPath: String = ""
@@ -41,11 +50,11 @@ class BackupClientTest {
         server.stop(0)
     }
 
+    // ------------------------------------------------------- readable folders
+
     @Test
     fun `device folder is percent encoded in the path`() {
-        BackupClient(baseUrl).use { client ->
-            client.versions("Galaxy S23+", "set-1")
-        }
+        namedClient().use { it.versions("set-1") }
 
         assertEquals("GET", method)
         assertEquals("/api/v1/sets/Galaxy%20S23%2B/set-1/versions", rawPath)
@@ -54,9 +63,7 @@ class BackupClientTest {
 
     @Test
     fun `previous folder ids arrive decoded exactly as stored`() {
-        BackupClient(baseUrl, previousDeviceIds = listOf("old-uuid", "Galaxy S23+")).use { client ->
-            client.manifest("Galaxy S23+", "set-1")
-        }
+        namedClient(previous = listOf("old-uuid", "Galaxy S23+")).use { it.manifest("set-1") }
 
         assertEquals("/api/v1/sets/Galaxy%20S23%2B/set-1/manifest", rawPath)
         assertEquals("old-uuid|Galaxy S23+", decodeQuery("previous"))
@@ -64,9 +71,7 @@ class BackupClientTest {
 
     @Test
     fun `deleting a version addresses the same folder`() {
-        BackupClient(baseUrl, previousDeviceIds = listOf("old-uuid")).use { client ->
-            client.deleteVersion("Galaxy S23+", "set-1", 7)
-        }
+        namedClient(previous = listOf("old-uuid")).use { it.deleteVersion("set-1", 7) }
 
         assertEquals("DELETE", method)
         assertEquals("/api/v1/sets/Galaxy%20S23%2B/set-1/versions/7", rawPath)
@@ -74,9 +79,9 @@ class BackupClientTest {
     }
 
     @Test
-    fun `session request carries the previous folder ids`() {
+    fun `session request carries the folder name and the previous ids`() {
         val request = StartSessionRequest(
-            deviceId = "Galaxy S23+",
+            deviceId = "",
             deviceName = "Galaxy S23+",
             setId = "set-1",
             setName = "Zdjęcia",
@@ -85,8 +90,10 @@ class BackupClientTest {
             previousDeviceIds = listOf("old-uuid", "Galaxy S23+"),
         )
 
-        BackupClient(baseUrl, previousDeviceIds = listOf("old-uuid", "Galaxy S23+")).use { client ->
-            client.startSession(request)
+        namedClient(previous = listOf("old-uuid", "Galaxy S23+")).use { client ->
+            // The engine fills the id in from the negotiated one, never by hand.
+            val withId = request.copy(deviceId = client.deviceId())
+            client.startSession(withId)
         }
 
         assertEquals("POST", method)
@@ -97,9 +104,7 @@ class BackupClientTest {
 
     @Test
     fun `no previous is sent when there is nothing to move`() {
-        BackupClient(baseUrl).use { client ->
-            client.versions("device-1", "set-1")
-        }
+        BackupClient(baseUrl, folderId = "device-1").use { it.versions("set-1") }
 
         assertEquals("/api/v1/sets/device-1/set-1/versions", rawPath)
         assertEquals("", rawQuery)
@@ -107,34 +112,108 @@ class BackupClientTest {
 
     @Test
     fun `file path parameter keeps a plus sign intact`() {
-        BackupClient(baseUrl).use { client ->
-            client.uploadFile("session-1", "DCIM/a+b.jpg", "digest", "644", { byteArrayInputStream() })
+        namedClient().use {
+            it.uploadFile("session-1", "DCIM/a+b.jpg", "digest", "644", { byteArrayInputStream() })
         }
 
         assertEquals("PUT", method)
         assertEquals("DCIM/a+b.jpg", decodeQuery("path"))
     }
 
+    // ------------------------------------------------------- older server
+
+    @Test
+    fun `older server is still addressed by the random id`() {
+        healthVersion = "1.1.0"
+
+        namedClient(previous = listOf("old-uuid")).use { client ->
+            assertEquals("legacy-uuid", client.deviceId())
+            client.versions("set-1")
+        }
+
+        assertEquals("/api/v1/sets/legacy-uuid/set-1/versions", rawPath)
+        assertEquals("", rawQuery)
+    }
+
+    @Test
+    fun `a two digit minor version counts as newer, not older`() {
+        // A plain string comparison would read "1.10.0" < "1.2.0" and pick the wrong folder.
+        healthVersion = "1.10.0"
+
+        namedClient().use { client ->
+            assertEquals("Galaxy S23+", client.deviceId())
+        }
+    }
+
+    @Test
+    fun `a server that does not report a version is treated as an old one`() {
+        healthVersion = ""
+
+        namedClient().use { client ->
+            assertEquals("legacy-uuid", client.deviceId())
+            client.versions("set-1")
+        }
+
+        assertEquals("/api/v1/sets/legacy-uuid/set-1/versions", rawPath)
+    }
+
+    @Test
+    fun `unknown folder ids fall back rather than being sent empty`() {
+        healthVersion = "1.1.0"
+
+        BackupClient(baseUrl, folderId = "Galaxy S23+").use { client ->
+            // No legacy id available: the readable one is the only thing to address.
+            assertEquals("Galaxy S23+", client.deviceId())
+        }
+    }
+
+    @Test
+    fun `a broken health check surfaces instead of choosing the wrong folder`() {
+        healthFails = true
+
+        try {
+            namedClient().use { it.versions("set-1") }
+            throw AssertionError("expected the health probe to fail the call")
+        } catch (expected: BackupApiException) {
+            assertTrue(expected.message.orEmpty(), expected.message.orEmpty().contains("HTTP 500"))
+        }
+    }
+
     // ------------------------------------------------------------------ helpers
+
+    private fun namedClient(previous: List<String> = emptyList()) = BackupClient(
+        baseUrl,
+        folderId = "Galaxy S23+",
+        legacyId = { "legacy-uuid" },
+        previousIds = previous,
+    )
 
     private fun handle(exchange: HttpExchange) {
         method = exchange.requestMethod
         rawPath = exchange.requestURI.rawPath
         rawQuery = exchange.requestURI.rawQuery.orEmpty()
         body = exchange.requestBody.readBytes().toString(Charsets.UTF_8)
+        // The upload call has a gzipped body; swallow it so the response can be written back.
+        exchange.requestBody.readBytes()
+
+        if (rawPath.endsWith("/health")) {
+            respond(exchange, if (healthFails) 500 else 200, """{"status":"ok","version":"$healthVersion"}""")
+            return
+        }
 
         val payload = when {
             rawPath.endsWith("/versions") -> """{"versions":[]}"""
             rawPath.endsWith("/manifest") -> """{"version":1,"entries":[]}"""
             rawPath.endsWith("/sessions") -> """{"sessionId":"session-1","baseVersion":0}"""
-            rawPath.endsWith("/health") -> """{"status":"ok","version":"1.2.0"}"""
             else -> "{}"
         }
-        // The upload call has a gzipped body; swallow it so the response can be written back.
-        exchange.requestBody.readBytes()
+        respond(exchange, 200, payload)
+    }
+
+    private fun respond(exchange: HttpExchange, status: Int, payload: String) {
         val bytes = payload.toByteArray(Charsets.UTF_8)
         exchange.responseHeaders.add("Content-Type", "application/json")
-        exchange.sendResponseHeaders(200, bytes.size.toLong())
+        exchange.sendResponseHeaders(status, bytes.size.toLong())
         exchange.responseBody.use { it.write(bytes) }
     }
 

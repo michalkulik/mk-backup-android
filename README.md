@@ -44,6 +44,9 @@ Serwer: <https://github.com/michalkulik/mk-backup-server>
   będzie to `Galaxy S23+`), można ją nadpisać w Ustawieniach. Znakom `/ \ : * ? " < > |` i znaki
   sterujące są usuwane, a po zmianie nazwy serwer przenosi dotychczasowe kopie razem z historią
   wersji — nic nie trzeba wysyłać od nowa.
+  Czytelne foldery obsługuje serwer od **v1.2.0**; starszy serwer jest rozpoznawany po wersji
+  z `/api/v1/health` i wtedy aplikacja nadal używa dotychczasowego losowego identyfikatora,
+  więc samo zainstalowanie nowej wersji aplikacji nigdy nie dzieli kopii na dwa katalogi.
 
 ## Jak to działa
 
