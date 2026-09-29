@@ -79,6 +79,9 @@ jobs:
               i przełącznikiem w Ustawieniach,
             * skrót do wyłączenia optymalizacji baterii i przyznania dostępu do plików,
             * niezawodne zatrzymanie kopii nawet podczas łączenia z błędnym adresem serwera,
+            * kopie trafiają na serwer do folderu o nazwie urządzenia z ustawień telefonu
+              (np. `sets/Galaxy S23+/…`) — nazwę można zmienić w Ustawieniach, a istniejące
+              kopie serwer przenosi razem z historią wersji,
             * natywny interfejs Material 3.
 
             Instalacja: pobierz plik `mk-backup-${{ github.ref_name }}.apk` i zainstaluj go
